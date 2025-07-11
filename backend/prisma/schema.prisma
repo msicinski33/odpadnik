@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  avatarUrl String?
+}
+
+model Employee {
+  id        Int      @id @default(autoincrement())
+  name      String
+  surname   String
+  position  String
+  phone     String
+  email     String?
+  hiredAt   DateTime?
+  terminatedAt DateTime?
+  notes     String?
+  hasDisabilityCertificate Boolean @default(false)
+  employeeSchedules EmployeeSchedule[]
+  drivenAssignments DailyAssignment[] @relation("DriverAssignments")
+  assistantAssignments DailyAssignmentAssistant[]
+  workCardEntries WorkCardEntry[]
+}
+
+model Vehicle {
+  id                Int    @id @default(autoincrement())
+  brand             String
+  registrationNumber String @unique
+  vehicleType       String
+  capacity          Float
+  fuelType          String
+  purchaseDate      DateTime?
+  isActive          Boolean @default(true)
+  faultStatus       String  @default("operational") // "operational" | "faulty"
+  dailyAssignments DailyAssignment[]
+  faultReports     VehicleFaultReport[]
+}
+
+model Region {
+  id        Int    @id @default(autoincrement())
+  name      String
+  unitName  String
+  notes     String?
+  
+  points    Point[]
+  regionFractions RegionFraction[]
+  calendarEntries CalendarEntry[]
+  dailyAssignments DailyAssignment[]
+}
+
+model Fraction {
+  id      Int    @id @default(autoincrement())
+  name    String
+  code    String
+  color   String
+
+  pointFractions PointFraction[]
+  regionFractions RegionFraction[]
+  calendarEntries CalendarEntry[]
+  fractionsInAssignments DailyAssignmentFraction[]
+}
+
+model Point {
+  id             Int      @id @default(autoincrement())
+  type           String   // 'zamieszkala' | 'niezamieszkala'
+  town           String
+  street         String
+  number         String
+  notes          String?
+  companyName    String?
+  activityNotes  String?
+  startDate      DateTime?
+  endDate        DateTime?
+  isIndefinite   Boolean  @default(false)
+  kompostownik   Boolean  @default(false)
+  
+  regionId       Int?
+  region         Region?   @relation(fields: [regionId], references: [id])
+
+  pointFractions PointFraction[]
+}
+
+model PointFraction {
+  id              Int      @id @default(autoincrement())
+  pointId         Int
+  fractionId      Int
+  containerSize   String
+  pickupFrequency String
+
+  point           Point    @relation(fields: [pointId], references: [id])
+  fraction        Fraction @relation(fields: [fractionId], references: [id])
+}
+
+model EmployeeSchedule {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  date        DateTime
+  shift       String
+  customHours String?
+  colorCode   String?
+
+  employee    Employee @relation(fields: [employeeId], references: [id])
+}
+
+model RegionFraction {
+  id         Int      @id @default(autoincrement())
+  regionId   Int
+  fractionId Int
+
+  region     Region   @relation(fields: [regionId], references: [id])
+  fraction   Fraction @relation(fields: [fractionId], references: [id])
+
+  @@unique([regionId, fractionId])
+}
+
+model CalendarEntry {
+  id         Int      @id @default(autoincrement())
+  regionId   Int
+  fractionId Int
+  date       DateTime
+
+  region     Region   @relation(fields: [regionId], references: [id])
+  fraction   Fraction @relation(fields: [fractionId], references: [id])
+
+  @@unique([regionId, fractionId, date])
+}
+
+model DailyAssignment {
+  id             Int      @id @default(autoincrement())
+  date           DateTime
+  regionId       Int
+  vehicleId      Int
+  driverId       Int?
+  type           DailyAssignmentType
+  shift          String
+  municipalityId Int?
+  municipality   Municipality? @relation(fields: [municipalityId], references: [id])
+  equipment      Json?   // For sprzątanie: array of { name, quantity }
+  workType       String? // For sprzątanie: free text
+  region         Region   @relation(fields: [regionId], references: [id])
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver         Employee? @relation("DriverAssignments", fields: [driverId], references: [id])
+  assistants     DailyAssignmentAssistant[]
+  fractions      DailyAssignmentFraction[]
+}
+
+enum DailyAssignmentType {
+  bezpylne
+  sprzątanie
+}
+
+model DailyAssignmentAssistant {
+  id                Int             @id @default(autoincrement())
+  dailyAssignmentId Int
+  employeeId        Int
+
+  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
+  employee          Employee        @relation(fields: [employeeId], references: [id])
+}
+
+model DailyAssignmentFraction {
+  id                Int             @id @default(autoincrement())
+  dailyAssignmentId Int
+  fractionId        Int
+  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
+  fraction          Fraction        @relation(fields: [fractionId], references: [id])
+}
+
+model VehicleFaultReport {
+  id          Int      @id @default(autoincrement())
+  vehicleId   Int
+  reportedBy  String   // User name who reported the fault
+  description String?
+  reportedAt  DateTime @default(now())
+  resolvedAt  DateTime?
+  isResolved  Boolean  @default(false)
+  
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+} 
+
+model WorkOrder {
+  id             Int      @id @default(autoincrement())
+  type           String   // surowce, uslugi, worki, bramy, bezpylne
+  dateReceived   DateTime
+  realizationDate DateTime? // data realizacji
+  quantity       Int?       // ilość
+  orderNumber    String?    // numer zlecenia/KPO
+  bagNumber      String?    // numer worka
+  executionDate  DateTime   // legacy, for other types
+  receivedBy     String
+  address        String
+  municipality   String?
+  company        String?
+  wasteType      String?   // surowce, worki, etc.
+  rodzaj         String?   // surowce only, or worki: M, M (99 zł), D
+  kontener       String?   // dla uslugi, bramy
+  description    String?   // legacy
+  notes          String?   // uwagi
+  failureReason  String?   // powód niezrealizowania
+  vehicle        String?
+  responsible    String?
+  completed      Boolean   @default(false)
+  zlecenie       String?   // tylko dla bezpylne
+} 
+
+model Municipality {
+  id              Int              @id @default(autoincrement())
+  name            String
+  dailyAssignments DailyAssignment[]
+} 
+
+model RodzajAbsencji {
+  id    Int    @id @default(autoincrement())
+  name  String
+  code  String?
+  color String?
+  notes String?
+  workCardEntries WorkCardEntry[]
+} 
+
+model WorkCardEntry {
+  id            Int      @id @default(autoincrement())
+  employeeId    Int
+  date          DateTime
+  actualFrom    String?  // e.g., "07:00"
+  actualTo      String?  // e.g., "15:00"
+  actualTotal   Float?   // e.g., 8.0
+  absenceTypeId Int?     // nullable, FK to RodzajAbsencji
+  onCall        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  employee      Employee        @relation(fields: [employeeId], references: [id])
+  absenceType   RodzajAbsencji? @relation(fields: [absenceTypeId], references: [id])
+
+  @@unique([employeeId, date])
+} 
