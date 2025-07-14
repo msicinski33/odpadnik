@@ -4,11 +4,12 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { authenticateToken, requireAdmin } = require('./authMiddleware');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-// Register
-router.post('/register', async (req, res) => {
+// Register (admin only)
+router.post('/register', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { password, ...rest } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,6 +28,7 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user.isActive) return res.status(401).json({ error: 'Konto zostało zablokowane. Skontaktuj się z administratorem.' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });

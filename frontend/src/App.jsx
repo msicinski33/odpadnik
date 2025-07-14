@@ -8,6 +8,7 @@ import Regions from './pages/Regions';
 import Profile from './pages/Profile';
 import Fractions from './pages/Fractions';
 import Trasowka from './pages/Trasowka';
+import Users from './pages/Users';
 import { UserContext } from './UserContext';
 import { AppSidebar } from './components/AppSidebar';
 import Dashboard from './pages/Dashboard';
@@ -20,6 +21,7 @@ import MonthlySchedule from './pages/MonthlySchedule';
 import DailyPlan from './pages/DailyPlan';
 import AbsenceTypes from './pages/AbsenceTypes';
 import WorkCardPage from './pages/WorkCard';
+import Documents from './pages/Documents';
 
 const queryClient = new QueryClient();
 
@@ -72,6 +74,8 @@ function App() {
             <Route path="/MonthlySchedule" element={<ProtectedRoute user={user}><MonthlySchedule /></ProtectedRoute>} />
             <Route path="/absence-types" element={<AbsenceTypes />} />
             <Route path="/work-card" element={<ProtectedRoute user={user}><WorkCardPage /></ProtectedRoute>} />
+            <Route path="/documents" element={<ProtectedRoute user={user}><Documents /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute user={user}><Users /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
           </Routes>
         </div>

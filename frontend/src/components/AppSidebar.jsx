@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { HomeIcon, UsersIcon, TruckIcon, MapIcon, RectangleGroupIcon, ChartBarIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon, ClipboardDocumentListIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, UsersIcon, TruckIcon, MapIcon, RectangleGroupIcon, ChartBarIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon, ClipboardDocumentListIcon, HeartIcon, ShieldCheckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { NavLink } from 'react-router-dom';
 import { UserContext } from '../UserContext';
 
@@ -13,6 +13,7 @@ const navItems = [
   { name: 'Rodzaje absencji', to: '/absence-types', icon: HeartIcon },
   { name: 'Harmonogram', to: '/waste-calendar-demo', icon: CalendarIcon },
   { name: 'Zlecenia', to: '/WorkOrders', icon: ClipboardDocumentListIcon },
+  { name: 'Dokumenty', to: '/documents', icon: DocumentTextIcon },
   { name: 'Profil', to: '/profile', icon: UserCircleIcon },
 ];
 
@@ -89,6 +90,29 @@ const AppSidebar = ({ handleLogout }) => {
                   <span className="truncate">{item.name}</span>
                 </button>
               ))}
+              {/* Admin only - User Management */}
+              {user?.role === 'admin' && (
+                <NavLink
+                  to="/users"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-red-600 text-white shadow-lg' 
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <ShieldCheckIcon className="w-5 h-5 flex-shrink-0" />
+                      <span className="truncate">Zarządzanie Użytkownikami</span>
+                      {isActive && (
+                        <div className="w-2 h-2 bg-white rounded-full ml-auto flex-shrink-0"></div>
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              )}
             </div>
           </div>
         </nav>

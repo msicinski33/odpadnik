@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const authenticateToken = require('./authMiddleware');
+const { authenticateToken, requireAdmin } = require('./authMiddleware');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -83,6 +83,74 @@ router.put('/me/password', authenticateToken, async (req, res) => {
 router.get('/admin-only', authenticateToken, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden: Admins only' });
   res.json({ message: 'Welcome, admin!' });
+});
+
+// Get all users (admin only)
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        avatarUrl: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update user (admin only)
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { name, email, role, isActive } = req.body;
+    
+    // Prevent admin from deactivating themselves
+    if (userId === req.user.id && isActive === false) {
+      return res.status(400).json({ error: 'Nie możesz zablokować własnego konta' });
+    }
+    
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { name, email, role, isActive },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        avatarUrl: true
+      }
+    });
+    res.json(user);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete user (admin only)
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    
+    // Prevent admin from deleting themselves
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Nie możesz usunąć własnego konta' });
+    }
+    
+    await prisma.user.delete({ where: { id: userId } });
+    res.json({ message: 'Użytkownik usunięty' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
 });
 
 module.exports = router; 

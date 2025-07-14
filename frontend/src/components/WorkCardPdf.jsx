@@ -40,14 +40,15 @@ function calcNightHours(row) {
   return Math.round((night / 60) * 100) / 100;
 }
 
-function getOvertimeCell(row) {
+function getOvertimeCell(row, employee) {
   if (row.absenceTypeId) return '—';
   const planned = row.scheduled ? row.scheduled.total : null;
   const actual = row.actualTotal ? Number(row.actualTotal) : null;
   if (!actual) return '—';
+  const hoursPerDay = employee?.hasDisabilityCertificate ? 7 : 8;
   if (!planned) {
-    if (actual <= 8) return `${actual}h x 100`;
-    else return `8h x 100, ${(actual - 8)}h x 50`;
+    if (actual <= hoursPerDay) return `${actual}h x 100`;
+    else return `${hoursPerDay}h x 100, ${(actual - hoursPerDay)}h x 50`;
   } else if (actual > planned) {
     return `${(actual - planned)}h x 50`;
   } else if (actual < planned) {
@@ -81,7 +82,7 @@ function isWorkingDay(dateStr) {
   return true;
 }
 
-export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
+export default function WorkCardPdf({ rows, employee, month, absenceTypes, userName }) {
   const daysInMonth = new Date(Number(month.split('-')[0]), Number(month.split('-')[1]), 0).getDate();
   // Calculate working days in the month
   const year = Number(month.split('-')[0]);
@@ -91,12 +92,13 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
     const dateStr = `${year}-${pad2(mon)}-${pad2(day)}`;
     if (isWorkingDay(dateStr)) workingDays++;
   }
-  const nominalnyCzasPracy = workingDays * 8;
+  const hoursPerDay = employee?.hasDisabilityCertificate ? 7 : 8;
+  const nominalnyCzasPracy = workingDays * hoursPerDay;
   const totalPlanned = rows.reduce((sum, row) => sum + (row.scheduled && !row.isDyzurowy ? row.scheduled.total : 0), 0);
   const totalDyzurowy = rows.reduce((sum, row) => {
     // Only count dyżur if there is a dyżur shift and NO actual work
     if (row.isDyzurowy && !(row.actualFrom && row.actualTo && row.actualTotal)) {
-      return sum + 8;
+      return sum + hoursPerDay;
     }
     return sum;
   }, 0);
@@ -104,9 +106,9 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
     if (row.actualFrom && row.actualTo && row.actualTotal) {
       return sum + Number(row.actualTotal);
     }
-    // If absenceTypeId is set (and no actualFrom/actualTo), count planned hours as actual (like frontend)
-    if (row.absenceTypeId && !row.actualFrom && !row.actualTo && row.scheduled) {
-      return sum + row.scheduled.total;
+    // If absenceTypeId is set (and no actualFrom/actualTo), count hoursPerDay as actual
+    if (row.absenceTypeId && !row.actualFrom && !row.actualTo) {
+      return sum + hoursPerDay;
     }
     return sum;
   }, 0);
@@ -126,8 +128,8 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
     const actual = row.actualTotal ? Number(row.actualTotal) : null;
     if (!actual) return;
     if (!planned) {
-      if (actual <= 8) total100 += actual;
-      else { total100 += 8; total50 += (actual - 8); }
+      if (actual <= hoursPerDay) total100 += actual;
+      else { total100 += hoursPerDay; total50 += (actual - hoursPerDay); }
     } else if (actual > planned) {
       total50 += (actual - planned);
     } else if (actual < planned) {
@@ -153,6 +155,7 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
 
   return (
     <div style={{ position: 'relative' }}>
+      {/* First page content */}
       <div style={{ width: '100%', textAlign: 'left', fontSize: '11px', lineHeight: '1.3', fontWeight: 'normal', marginBottom: '8px' }}>
         Zakład Utrzymania Czystości<br />
         Przedsiębiorstwo Gospodarki Komunalnej Spółka z o.o.<br />
@@ -163,6 +166,7 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
       <h2 style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: 4, textAlign: 'center' }}>
         KARTA PRACY ZA MIESIĄC {getPolishMonthName(month)} {employee?.name && employee?.surname ? (employee.name + ' ' + employee.surname).toUpperCase() : ''}
       </h2>
+      {/* Main table and rest of the content */}
       <table style={{
         width: '100%',
         borderCollapse: 'collapse',
@@ -198,13 +202,13 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
                   : '—'}
               </td>
               <td style={tdStyle}>
-                {row.absenceTypeId
-                  ? (() => {
-                      const code = absenceTypes?.find(t => t.id === row.absenceTypeId)?.code || row.absenceTypeId;
-                      const hours = row.scheduled ? row.scheduled.total : null;
-                      return hours ? `${code} (${Number.isInteger(hours) ? hours : hours.toFixed(2)}h)` : code;
-                    })()
-                  : '—'}
+                {row.absenceTypeId ? (
+                  <>
+                    {absenceTypes.find(a => a.id === row.absenceTypeId)?.code || 'ABS'} <span>({hoursPerDay}h)</span>
+                  </>
+                ) : (
+                  '—'
+                )}
               </td>
               <td style={tdStyle}>
                 {(row.shiftCode === 'D1' || row.shiftCode === 'D2' || row.shiftCode === 'D3') && !(row.actualFrom && row.actualTo && row.actualTotal)
@@ -216,7 +220,7 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
                   : (row.onCall ? '✔' : '—')}
               </td>
               <td style={tdStyle}>
-                {getOvertimeCell(row)}
+                {getOvertimeCell(row, employee)}
               </td>
             </tr>
           ))}
@@ -256,8 +260,54 @@ export default function WorkCardPdf({ rows, employee, month, absenceTypes }) {
             const pad = n => n < 10 ? '0' + n : n;
             const godzina = pad(now.getHours()) + ':' + pad(now.getMinutes());
             const dzien = pad(now.getDate()) + '.' + pad(now.getMonth() + 1) + '.' + now.getFullYear();
-            return `Wygenerowano ${dzien}, ${godzina} przez:`;
+            return `Wygenerowano ${dzien}, ${godzina} przez ${userName || ''} w systemie ODPADnik`;
           })()}
+        </div>
+      </div>
+      {/* Time-off request and signature fields, no bold, right-aligned signature */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: '32px', width: '100%' }}>
+        <div style={{ fontWeight: 'normal', fontSize: '11px', width: '100%' }}>
+          *Wnioskuję o udzielenie czasu wolnego w dniu ….................... w ilości godzin …...............    w zamian za wykonywanie pracy w godzinach nadliczbowych zgodnie z kartą pracy.
+        </div>
+        <div style={{ marginTop: '24px', fontSize: '10px', textAlign: 'right', width: '100%' }}>
+          .......................................................<br />
+          Podpis pracownika
+        </div>
+      </div>
+      {/* Supervisor remarks and signatures section - improved vertical spacing and placement */}
+      <div style={{ marginTop: '64px', width: '100%' }}>
+        <div style={{ fontSize: '11px', marginBottom: '40px' }}>Uwagi bezpośredniego przełożonego:</div>
+        <div style={{ height: '60px' }}></div>
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', marginBottom: '32px' }}>
+          <div style={{ minWidth: '320px' }}>
+            <div style={{ fontSize: '10px', textAlign: 'left' }}>.......................................................</div>
+            <div style={{ fontSize: '10px', textAlign: 'left', marginTop: '2px' }}>(podpis bezpośredniego przełożonego/kierownika jednostki organizacyjnej)</div>
+          </div>
+        </div>
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', marginTop: '96px' }}>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontSize: '10px' }}>.......................................................</div>
+            <div style={{ fontSize: '10px', textAlign: 'left', marginTop: '2px' }}>podpis Sekcja Kadr</div>
+          </div>
+          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            {/* Empty for spacing */}
+          </div>
+        </div>
+        {/* Akceptacja signature row */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', marginTop: '60px' }}>
+          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            <div style={{ fontSize: '10px' }}>.......................................................</div>
+            <div style={{ fontSize: '10px', textAlign: 'right', marginTop: '2px' }}>Akceptacja</div>
+          </div>
+        </div>
+        {/* Legal basis row, further down */}
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'flex-start', marginTop: '60px' }}>
+          <div style={{ flex: 1, textAlign: 'left', fontSize: '10px' }}>
+            Podstawa prawna art. 151<sup>2</sup> § 1<sup>3</sup> ustawy z dnia 26 czerwca 1974 r.
+          </div>
         </div>
       </div>
     </div>

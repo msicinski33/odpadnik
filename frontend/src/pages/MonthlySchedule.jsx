@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import authFetch from "../utils/authFetch";
 import { format, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { Button } from "../components/ui/button";
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "../components/ui/select";
+import MultiSelect from "../components/ui/MultiSelect";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Calendar, Clock, Users, Save, Trash2, Plus, Info } from "lucide-react";
+import { Calendar, Clock, Users, Save, Trash2, Plus, Info, FileText } from "lucide-react";
 import { pl } from "date-fns/locale";
 import { toast } from "sonner";
+import { UserContext } from "../UserContext";
 
 const shifts = [
   { id: "6-14", label: "Zmiana poranna", time: "6:00 - 14:00", color: "bg-blue-100 text-blue-800 border-blue-200" },
+  { id: "7-15", label: "Zmiana poranna (7-15)", time: "7:00 - 15:00", color: "bg-blue-100 text-blue-800 border-blue-200" },
   { id: "14-22", label: "Zmiana popołudniowa", time: "14:00 - 22:00", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
   { id: "22-6", label: "Zmiana nocna", time: "22:00 - 6:00", color: "bg-purple-100 text-purple-800 border-purple-200" },
   { id: "NU", label: "Nieobecność", time: "Wolne", color: "bg-red-100 text-red-800 border-red-200" },
@@ -25,11 +28,13 @@ const shifts = [
 
 export default function MonthlySchedule(props) {
   const { modalContainer } = props || {};
+  const { user } = useContext(UserContext);
   const [month, setMonth] = useState(new Date(2025, 6));
   const [allEmployees, setAllEmployees] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [schedule, setSchedule] = useState({});
-  const [position, setPosition] = useState("ALL");
+  // Replace position with selectedPositions (array)
+  const [selectedPositions, setSelectedPositions] = useState([]); // [] means all
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [bulkAssignModal, setBulkAssignModal] = useState({ open: false, employee: null });
   const [modalData, setModalData] = useState({ empId: null, start: "", end: "", shift: "6-14" });
@@ -38,8 +43,9 @@ export default function MonthlySchedule(props) {
   const [isLoading, setIsLoading] = useState(false);
   const [dragState, setDragState] = useState({
     isDragging: false,
-    empId: null,
+    startEmpId: null,
     startIdx: null,
+    endEmpId: null,
     endIdx: null,
   });
 
@@ -67,12 +73,14 @@ export default function MonthlySchedule(props) {
   function getEmployeeHours(empId) {
     const days = Object.keys(schedule[empId] || {});
     let total = 0;
+    const employee = employees.find(emp => emp.id === empId);
     days.forEach(day => {
       const shift = schedule[empId][day];
-      if (["6-14", "14-22", "22-6", "CUSTOM"].includes(shift)) {
-        total += 8;
+      if (["6-14", "7-15", "14-22", "22-6", "CUSTOM", "NU"].includes(shift)) {
+        // Employees with disability certificates work 7 hours instead of 8
+        total += employee?.hasDisabilityCertificate ? 7 : 8;
       }
-      // D1, D2, D3, NU = 0h (nieobecność)
+      // D1, D2, D3 = 0h (nieobecność)
     });
     return total;
   }
@@ -80,8 +88,11 @@ export default function MonthlySchedule(props) {
   // Zmodyfikowana funkcja zapisu
   const handleSave = async () => {
     const monthIdx = month.getMonth();
-    const required = requiredHours2025[monthIdx];
-    const mismatches = employees.filter(emp => getEmployeeHours(emp.id) !== required);
+    const standardRequired = requiredHours2025[monthIdx];
+    const mismatches = employees.filter(emp => {
+      const required = emp.hasDisabilityCertificate ? Math.round(standardRequired * 7 / 8) : standardRequired;
+      return getEmployeeHours(emp.id) !== required;
+    });
     if (mismatches.length > 0) {
       setMismatchedEmployees(mismatches);
       setShowWarningModal(true);
@@ -119,6 +130,69 @@ export default function MonthlySchedule(props) {
     await doSave();
   };
 
+  // PDF Export function
+  const handleExportPDF = async () => {
+    try {
+      // Import ReactDOMServer dynamically to avoid SSR issues
+      const ReactDOMServer = await import('react-dom/server');
+      
+      // Import the PDF component dynamically
+      const MonthlySchedulePdf = (await import('../components/MonthlySchedulePdf')).default;
+      
+      // Generate HTML using the PDF component
+      const htmlContent = ReactDOMServer.renderToString(
+        React.createElement(MonthlySchedulePdf, {
+          employees,
+          schedule,
+          month: format(month, "yyyy-MM"),
+          userName: user?.name || '',
+          selectedPositions
+        })
+      );
+      
+      // Create complete HTML document
+      const fullHtml = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>Grafik miesięczny PDF</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 24px; }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+        </html>
+      `;
+
+      const response = await authFetch('/api/pdf/monthly-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: fullHtml,
+          fileName: `grafik-miesieczny_${format(month, "yyyy-MM")}.pdf`
+        })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `grafik-miesieczny_${format(month, "yyyy-MM")}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("PDF wygenerowany pomyślnie.");
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error("Błąd podczas generowania PDF.");
+    }
+  };
+
   // Fetch all employees and their schedules for the selected month
   useEffect(() => {
     const fetchData = async () => {
@@ -129,10 +203,30 @@ export default function MonthlySchedule(props) {
         const allEmps = await resEmp.json();
         setAllEmployees(allEmps);
         
-        // Filter by position on frontend
+        // Filter by positions (multi)
         const filtered = allEmps
-          .filter(e => position === 'ALL' || (e.position && e.position.toLowerCase() === position.toLowerCase()))
+          .filter(e => selectedPositions.length === 0 || (e.position && selectedPositions.includes(e.position)))
           .sort((a, b) => {
+            // Hierarchy order (normalized)
+            const normalize = s => (s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+            const hierarchy = [
+              'kierownik',
+              'z-ca kierownika',
+              'specjalista',
+              'dyspozytor',
+            ];
+            const idxA = hierarchy.indexOf(normalize(a.position));
+            const idxB = hierarchy.indexOf(normalize(b.position));
+            if (idxA !== -1 && idxB !== -1) {
+              if (idxA !== idxB) return idxA - idxB;
+            } else if (idxA !== -1) {
+              return -1;
+            } else if (idxB !== -1) {
+              return 1;
+            }
+            // If not in hierarchy, sort by position, then surname, then name
+            const posA = (a.position || '').localeCompare(b.position || '', 'pl');
+            if (posA !== 0) return posA;
             const sA = (a.surname || '').localeCompare(b.surname || '', 'pl');
             if (sA !== 0) return sA;
             return (a.name || '').localeCompare(b.name || '', 'pl');
@@ -158,7 +252,7 @@ export default function MonthlySchedule(props) {
       }
     };
     fetchData();
-  }, [month, position]);
+  }, [month, selectedPositions]);
 
   const days = [];
   let current = startOfMonth(month);
@@ -196,36 +290,49 @@ export default function MonthlySchedule(props) {
 
   const handleCellMouseDown = (empId, dayIdx) => {
     if (!selectedLegendShift) return;
-    setDragState({ isDragging: true, empId, startIdx: dayIdx, endIdx: dayIdx });
+    setDragState({ isDragging: true, startEmpId: empId, startIdx: dayIdx, endEmpId: empId, endIdx: dayIdx });
   };
 
   const handleCellMouseEnter = (empId, dayIdx) => {
-    if (!dragState.isDragging || dragState.empId !== empId) return;
-    setDragState((prev) => ({ ...prev, endIdx: dayIdx }));
+    if (!dragState.isDragging) return;
+    setDragState((prev) => ({ ...prev, endEmpId: empId, endIdx: dayIdx }));
   };
 
-  const handleCellMouseUp = (empId, dayIdx) => {
-    if (!dragState.isDragging || dragState.empId !== empId) return;
-    const { startIdx, endIdx } = dragState;
-    let from = Math.min(startIdx, endIdx);
-    let to = Math.max(startIdx, endIdx);
+  const handleCellMouseUp = () => {
+    if (!dragState.isDragging) return;
+    const { startEmpId, endEmpId, startIdx, endIdx } = dragState;
+    // Find employee indices
+    const empIds = filteredEmployees.map(e => e.id);
+    const fromEmpIdx = Math.min(empIds.indexOf(startEmpId), empIds.indexOf(endEmpId));
+    const toEmpIdx = Math.max(empIds.indexOf(startEmpId), empIds.indexOf(endEmpId));
+    const fromDay = Math.min(startIdx, endIdx);
+    const toDay = Math.max(startIdx, endIdx);
     let shiftValue = selectedLegendShift;
     if (shiftValue === "CUSTOM") {
       const custom = window.prompt("Wprowadź własne godziny (np. 5-13):");
       if (!custom || !custom.trim()) {
-        setDragState({ isDragging: false, empId: null, startIdx: null, endIdx: null });
+        setDragState({ isDragging: false, startEmpId: null, startIdx: null, endEmpId: null, endIdx: null });
         return;
       }
       shiftValue = custom.trim();
     }
     if (shiftValue === 'DELETE') shiftValue = undefined;
-    applyShiftRange(empId, from, to, shiftValue);
-    setDragState({ isDragging: false, empId: null, startIdx: null, endIdx: null });
+    // Apply to all selected employees and days
+    for (let empIdx = fromEmpIdx; empIdx <= toEmpIdx; empIdx++) {
+      const empId = empIds[empIdx];
+      const newData = { ...schedule[empId] };
+      for (let i = fromDay; i <= toDay; i++) {
+        const dateStr = format(days[i], "yyyy-MM-dd");
+        newData[dateStr] = shiftValue;
+      }
+      setSchedule(prev => ({ ...prev, [empId]: newData }));
+    }
+    setDragState({ isDragging: false, startEmpId: null, startIdx: null, endEmpId: null, endIdx: null });
   };
 
   const handleTableMouseLeave = () => {
     if (dragState.isDragging) {
-      setDragState({ isDragging: false, empId: null, startIdx: null, endIdx: null });
+      setDragState({ isDragging: false, startEmpId: null, startIdx: null, endEmpId: null, endIdx: null });
     }
   };
 
@@ -297,7 +404,7 @@ export default function MonthlySchedule(props) {
   const [activeTab, setActiveTab] = useState('ALL');
 
   useEffect(() => {
-    setPosition(activeTab);
+    setSelectedPositions(activeTab === 'ALL' ? [] : [activeTab]);
   }, [activeTab]);
 
   // Add Polish day abbreviations
@@ -357,10 +464,32 @@ export default function MonthlySchedule(props) {
                 </Select>
               </div>
 
+              {/* Position MultiSelect */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Filtruj po stanowisku</Label>
+                <MultiSelect
+                  options={allPositions.map(pos => ({ value: pos, label: pos }))}
+                  value={selectedPositions}
+                  onChange={setSelectedPositions}
+                  placeholder="Wszystkie stanowiska"
+                  className="w-64"
+                />
+              </div>
+
               {/* Save Button */}
               <Button onClick={handleSave} disabled={isLoading} className="ml-auto">
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? "Zapisywanie..." : "Zapisz grafik"}
+              </Button>
+              
+              {/* PDF Export Button */}
+              <Button 
+                onClick={handleExportPDF} 
+                disabled={isLoading || employees.length === 0}
+                variant="outline"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Eksportuj PDF
               </Button>
             </div>
           </CardContent>
@@ -513,13 +642,19 @@ export default function MonthlySchedule(props) {
                           let dragHighlight = "";
                           if (
                             dragState.isDragging &&
-                            dragState.empId === emp.id &&
-                            dragState.startIdx !== null &&
-                            dragState.endIdx !== null
+                            dragState.startEmpId && dragState.endEmpId &&
+                            dragState.startIdx !== null && dragState.endIdx !== null
                           ) {
-                            const from = Math.min(dragState.startIdx, dragState.endIdx);
-                            const to = Math.max(dragState.startIdx, dragState.endIdx);
-                            if (i >= from && i <= to) {
+                            const empIds = filteredEmployees.map(e => e.id);
+                            const fromEmpIdx = Math.min(empIds.indexOf(dragState.startEmpId), empIds.indexOf(dragState.endEmpId));
+                            const toEmpIdx = Math.max(empIds.indexOf(dragState.startEmpId), empIds.indexOf(dragState.endEmpId));
+                            const fromDay = Math.min(dragState.startIdx, dragState.endIdx);
+                            const toDay = Math.max(dragState.startIdx, dragState.endIdx);
+                            const thisEmpIdx = empIds.indexOf(emp.id);
+                            if (
+                              thisEmpIdx >= fromEmpIdx && thisEmpIdx <= toEmpIdx &&
+                              i >= fromDay && i <= toDay
+                            ) {
                               dragHighlight = "ring-2 ring-blue-400 bg-blue-100";
                             }
                           }
@@ -530,7 +665,7 @@ export default function MonthlySchedule(props) {
                               onClick={() => handleCellClick(emp, dateStr, shift)}
                               onMouseDown={() => handleCellMouseDown(emp.id, i)}
                               onMouseEnter={() => handleCellMouseEnter(emp.id, i)}
-                              onMouseUp={() => handleCellMouseUp(emp.id, i)}
+                              onMouseUp={handleCellMouseUp}
                               title={`${format(day, "EEEE, MMMM d", { locale: pl })} - Kliknij, aby przypisać zmianę`}
                               style={{ userSelect: 'none' }}
                             >

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import authFetch from '../utils/authFetch';
+import { UserContext } from '../UserContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -31,6 +32,7 @@ export default function WorkCard() {
   const [restWarning, setRestWarning] = useState(false);
   const [restWarningMessages, setRestWarningMessages] = useState([]);
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const { user } = useContext(UserContext);
 
   useEffect(() => {
     authFetch('/api/employees').then(res => res.json()).then(setEmployees);
@@ -63,6 +65,14 @@ export default function WorkCard() {
       return { from, to, total };
     }
     return null;
+  }
+
+  function adjustShiftForDisability(shift, hasDisabilityCertificate) {
+    if (!hasDisabilityCertificate) return shift;
+    if (shift === '6-14') return '6-13';
+    if (shift === '14-22') return '14-21';
+    if (shift === '22-6') return '22-5';
+    return shift;
   }
 
   // Polish public holidays (fixed and variable for 2025)
@@ -103,7 +113,10 @@ export default function WorkCard() {
         isDyzurowy = true;
         planned = null; // do not show planned time
       } else {
-        planned = parseShift(sched.customHours || sched.shift || '');
+        // ADJUSTMENT: use adjusted shift for disability before parsing
+        const selectedEmployee = employees.find(emp => emp.id === Number(employeeId));
+        const adjustedShift = adjustShiftForDisability(sched.customHours || sched.shift || '', selectedEmployee?.hasDisabilityCertificate);
+        planned = parseShift(adjustedShift);
       }
     }
     const entry = workCard.find(e => e.date.startsWith(dateStr)) || {};
@@ -167,13 +180,16 @@ export default function WorkCard() {
     return Math.round((night / 60) * 100) / 100;
   }
 
-  // Calculate nominalnyCzasPracy as working days * 8
+  // Calculate nominalnyCzasPracy as working days * hours (8 for normal, 7 for disability)
   const workingDays = rows.filter(row => isWorkingDay(row.dateStr)).length;
-  const nominalnyCzasPracy = workingDays * 8;
+  const selectedEmployee = employees.find(emp => emp.id === Number(employeeId));
+  const hoursPerDay = selectedEmployee?.hasDisabilityCertificate ? 7 : 8;
+  const nominalnyCzasPracy = workingDays * hoursPerDay;
   const planPracy = rows.reduce((sum, row) => sum + (row.scheduled && !row.isDyzurowy ? row.scheduled.total : 0), 0);
   const wykonanie = rows.reduce((sum, row) => {
-    if ((row.absenceTypeId && !row.actualFrom && !row.actualTo) && row.scheduled) {
-      return sum + row.scheduled.total;
+    if ((row.absenceTypeId && !row.actualFrom && !row.actualTo)) {
+      // Always count absence as hoursPerDay, even if no planned shift
+      return sum + hoursPerDay;
     }
     return sum + (row.actualTotal ? Number(row.actualTotal) : 0);
   }, 0);
@@ -182,7 +198,7 @@ export default function WorkCard() {
   const totalDyzurowy = rows.reduce((sum, row) => {
     // Only count dyżur if there is a dyżur shift and NO actual work
     if (row.isDyzurowy && !(row.actualFrom && row.actualTo && row.actualTotal)) {
-      return sum + 8;
+      return sum + hoursPerDay;
     }
     return sum;
   }, 0);
@@ -193,8 +209,9 @@ export default function WorkCard() {
     return sum;
   }, 0);
   const totalAbsence = rows.reduce((sum, row) => {
-    if (row.absenceTypeId && !row.actualFrom && !row.actualTo && row.scheduled) {
-      return sum + row.scheduled.total;
+    if (row.absenceTypeId && !row.actualFrom && !row.actualTo) {
+      // Always count absence as hoursPerDay, even if no planned shift
+      return sum + hoursPerDay;
     }
     return sum;
   }, 0);
@@ -205,8 +222,8 @@ export default function WorkCard() {
     const actual = row.actualTotal ? Number(row.actualTotal) : null;
     if (!actual) return;
     if (!planned) {
-      if (actual <= 8) total100 += actual;
-      else { total100 += 8; total50 += (actual - 8); }
+      if (actual <= hoursPerDay) total100 += actual;
+      else { total100 += hoursPerDay; total50 += (actual - hoursPerDay); }
     } else if (actual > planned) {
       total50 += (actual - planned);
     } else if (actual < planned) {
@@ -223,16 +240,14 @@ export default function WorkCard() {
     net50 = 0;
   } // if equal, both are 0
 
-  const selectedEmployee = employees.find(emp => emp.id === Number(employeeId));
-
   function getOvertimeCell(row) {
     if (row.absenceTypeId) return '—';
     const planned = row.scheduled ? row.scheduled.total : null;
     const actual = row.actualTotal ? Number(row.actualTotal) : null;
     if (!actual) return '—';
     if (!planned) {
-      if (actual <= 8) return `${actual}h x 100`;
-      else return `8h x 100, ${(actual - 8)}h x 50`;
+      if (actual <= hoursPerDay) return `${actual}h x 100`;
+      else return `${hoursPerDay}h x 100, ${(actual - hoursPerDay)}h x 50`;
     } else if (actual > planned) {
       return `${(actual - planned)}h x 50`;
     } else if (actual < planned) {
@@ -249,7 +264,11 @@ export default function WorkCard() {
     for (let i = 0; i < rows.length - 1; i++) {
       const current = rows[i];
       const next = rows[i + 1];
-      if (current.actualTo && next.actualFrom) {
+      // Only consider days with actual work, not absence
+      if (
+        current.actualTo && next.actualFrom &&
+        !current.absenceTypeId && !next.absenceTypeId
+      ) {
         const [ch, cm] = current.actualTo.split(':').map(Number);
         const [nh, nm] = next.actualFrom.split(':').map(Number);
         let rest = (nh + nm/60) - (ch + cm/60);
@@ -264,7 +283,8 @@ export default function WorkCard() {
     // Weekly rest (35h) validation
     for (let start = 0; start < rows.length - 6; start++) {
       const week = rows.slice(start, start + 7);
-      const workDays = week.filter(row => row.actualFrom && row.actualTo);
+      // Only count days with actual work, not absence
+      const workDays = week.filter(row => row.actualFrom && row.actualTo && !row.absenceTypeId);
       if (workDays.length >= 2) {
         const firstWorkDay = workDays[0];
         const lastWorkDay = workDays[workDays.length - 1];
@@ -339,7 +359,8 @@ export default function WorkCard() {
           rows,
           employee: selectedEmployee,
           month,
-          absenceTypes
+          absenceTypes,
+          userName: user?.name || ''
         })
       );
       
@@ -599,6 +620,7 @@ export default function WorkCard() {
                       let rowClass = "border-b hover:bg-muted/25 transition-colors";
                       if (isSunday || isHoliday) rowClass += " bg-red-50";
                       else if (isSaturday) rowClass += " bg-green-50";
+                      const hoursPerDay = selectedEmployee?.hasDisabilityCertificate ? 7 : 8;
                       return (
                         <tr key={row.day} className={rowClass}>
                           <td className="text-center p-3">
@@ -608,11 +630,11 @@ export default function WorkCard() {
                           </td>
                           <td className="text-center p-3">
                             {row.isDyzurowy ? (
-                              <span className="text-muted-foreground">—</span>
+                              <span style={{ color: '#888' }}>—</span>
                             ) : row.scheduled ? (
                               <span>{row.scheduled.from}–{row.scheduled.to} ({row.scheduled.total}h)</span>
                             ) : (
-                              <span className="text-muted-foreground">{row.scheduledRaw || '—'}</span>
+                              <span style={{ color: '#888' }}>—</span>
                             )}
                           </td>
                           <td className="text-center p-3">
@@ -638,21 +660,17 @@ export default function WorkCard() {
                             </div>
                           </td>
                           <td className="text-center p-3">
-                            {(!row.actualFrom && !row.actualTo) ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setAbsenceModal({ open: true, rowIdx: idx })}
-                                className="h-8"
-                              >
-                                {row.absenceTypeId
-                                  ? (absenceTypes.find(t => t.id === row.absenceTypeId)?.code || 'Nieznany')
-                                  : <span className="text-muted-foreground">Ustaw nieobecność</span>
-                                }
-                              </Button>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setAbsenceModal({ open: true, rowIdx: idx })}
+                              className="h-8"
+                            >
+                              {row.absenceTypeId
+                                ? <>{absenceTypes.find(a => a.id === row.absenceTypeId)?.code || 'ABS'} <span>({hoursPerDay}h)</span></>
+                                : <span className="text-muted-foreground">Ustaw nieobecność</span>
+                              }
+                            </Button>
                           </td>
                           <td className="text-center p-3">
                             {(row.shiftCode === 'D1' || row.shiftCode === 'D2' || row.shiftCode === 'D3') && !(row.actualFrom && row.actualTo && row.actualTotal) ? (

@@ -3,7 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const PdfPrinter = require('pdfmake');
-const authenticateToken = require('./authMiddleware');
+const { authenticateToken } = require('./authMiddleware');
 
 const fonts = {
   Roboto: {

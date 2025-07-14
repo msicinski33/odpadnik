@@ -69,6 +69,8 @@ const municipalitiesRouter = require('./routes/municipalities');
 const absenceTypesRouter = require('./routes/absenceTypes');
 const workCardRouter = require('./routes/workCard');
 const pdfRoute = require('./routes/pdf');
+const documentsRouter = require('./routes/documents');
+
 
 app.use('/api/employees', employeesRouter);
 app.use('/api/users', usersRoutes);
@@ -86,8 +88,10 @@ app.use('/api/municipalities', municipalitiesRouter);
 app.use('/api/absence-types', absenceTypesRouter);
 app.use('/api/work-card', workCardRouter);
 app.use('/api/pdf', pdfRoute);
+app.use('/api/documents', documentsRouter);
 app.use('/workorders', workOrdersRouter);
 app.use('/api', demoScheduleRouter);
+
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');

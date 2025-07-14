@@ -16,6 +16,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   avatarUrl String?
+  isActive  Boolean  @default(true)
+  
+  // Document relations
+  uploadedDocuments Document[] @relation("DocumentUploader")
+  deletedDocuments  Document[] @relation("DocumentDeleter")
+  uploadedAttachments DocumentAttachment[] @relation("AttachmentUploader")
+  annotations       DocumentAnnotation[] @relation("AnnotationUser")
 }
 
 model Employee {
@@ -247,4 +254,62 @@ model WorkCardEntry {
   absenceType   RodzajAbsencji? @relation(fields: [absenceTypeId], references: [id])
 
   @@unique([employeeId, date])
+}
+
+model Document {
+  id              Int      @id @default(autoincrement())
+  contractNumber  String?
+  parties         String   // e.g., "Your Company – XYZ Ltd."
+  description     String?
+  tags            String?  // comma-separated tags
+  fileName        String   // original filename
+  filePath        String   // path to stored file
+  fileSize        Int      // file size in bytes
+  mimeType        String   // e.g., "application/pdf"
+  uploadedBy      Int
+  uploadedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isDeleted       Boolean  @default(false)
+  deletedBy       Int?
+  deletedAt       DateTime?
+
+  uploader        User     @relation("DocumentUploader", fields: [uploadedBy], references: [id])
+  deleter         User?    @relation("DocumentDeleter", fields: [deletedBy], references: [id])
+  attachments     DocumentAttachment[]
+  annotations     DocumentAnnotation[]
+}
+
+model DocumentAttachment {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  fileName    String   // original filename
+  filePath    String   // path to stored file
+  fileSize    Int      // file size in bytes
+  mimeType    String   // e.g., "image/jpeg", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  uploadedBy  Int
+  uploadedAt  DateTime @default(now())
+  isDeleted   Boolean  @default(false)
+
+  document    Document @relation(fields: [documentId], references: [id])
+  uploader    User     @relation("AttachmentUploader", fields: [uploadedBy], references: [id])
+}
+
+model DocumentAnnotation {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  userId      Int
+  type        String   // "highlight", "note", "sticky", "link", "shape", "underline"
+  page        Int      // PDF page number
+  x           Float?   // x coordinate
+  y           Float?   // y coordinate
+  width       Float?   // width of annotation
+  height      Float?   // height of annotation
+  content     String?  // text content for notes
+  color       String?  // color code
+  data        Json?    // additional data (coordinates, text selection, etc.)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  document    Document @relation(fields: [documentId], references: [id])
+  user        User     @relation("AnnotationUser", fields: [userId], references: [id])
 } 
