@@ -13,7 +13,7 @@ const navItems = [
   { name: 'Rodzaje absencji', to: '/absence-types', icon: HeartIcon },
   { name: 'Harmonogram', to: '/waste-calendar-demo', icon: CalendarIcon },
   { name: 'Zlecenia', to: '/WorkOrders', icon: ClipboardDocumentListIcon },
-  { name: 'Dokumenty', to: '/documents', icon: DocumentTextIcon },
+  { name: 'Jednorazowe zlecenia', to: '/one-time-orders', icon: ClipboardDocumentListIcon },
   { name: 'Profil', to: '/profile', icon: UserCircleIcon },
 ];
 

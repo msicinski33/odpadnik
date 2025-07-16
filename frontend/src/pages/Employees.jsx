@@ -16,6 +16,20 @@ const fetchEmployees = async () => {
   return res.json();
 };
 
+// Helper to parse Excel date formats
+function parseExcelDate(val) {
+  if (!val) return undefined;
+  // Try ISO first
+  if (!isNaN(Date.parse(val))) return new Date(val).toISOString();
+  // Try DD.MM.YYYY
+  const match = val.match(/^([0-9]{2})\.([0-9]{2})\.([0-9]{4})$/);
+  if (match) {
+    const [_, d, m, y] = match;
+    return new Date(`${y}-${m}-${d}T00:00:00.000Z`).toISOString();
+  }
+  return undefined;
+}
+
 const Employees = () => {
   const [editing, setEditing] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -70,6 +84,9 @@ const Employees = () => {
   };
 
   const handleImport = async (data) => {
+    if (data && data.length > 0) {
+      console.log('IMPORT HEADERS:', Object.keys(data[0]));
+    }
     const get = (row, ...keys) => keys.find(k => row[k]) ? row[keys.find(k => row[k])] : '';
 
     const invalidRows = data.filter(employee =>
@@ -84,6 +101,21 @@ const Employees = () => {
 
     let errors = [];
     await Promise.all(data.map(async (employee, idx) => {
+      // Parse new fields with fallback/defaults
+      let workHoursRaw = get(employee, 'Wymiar pracy', 'workHours', 'WorkHours');
+      let workHours = workHoursRaw ? Number(workHoursRaw) : 8;
+      if (![7,8].includes(workHours)) workHours = 8;
+      let overtimeAllowedRaw = get(employee, 'Praca w godzinach nadliczbowych', 'overtimeAllowed', 'OvertimeAllowed');
+      let nightShiftAllowedRaw = get(employee, 'Praca w godzinach nocnych', 'nightShiftAllowed', 'NightShiftAllowed');
+      // Accept 'TAK', 'tak', 'yes', '1', true as true
+      const parseBool = v => {
+        if (!v) return false;
+        // Replace all whitespace (including non-breaking) with normal spaces, then trim and lowercase
+        const normalized = v.toString().replace(/\s|\u00A0/g, ' ').trim().toLowerCase();
+        return ['tak','yes','1','true'].includes(normalized);
+      };
+      let overtimeAllowed = parseBool(overtimeAllowedRaw);
+      let nightShiftAllowed = parseBool(nightShiftAllowedRaw);
       const res = await authFetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -92,8 +124,11 @@ const Employees = () => {
           position: get(employee, 'Stanowisko', 'Position', 'Stanowisko / Position'),
           phone: get(employee, 'Telefon', 'Phone', 'Telefon / Phone')?.toString() || '',
           email: get(employee, 'Email', 'E-mail'),
-          hiredAt: get(employee, 'Data zatrudnienia', 'HiredAt', 'hiredAt') || undefined,
-          hasDisabilityCertificate: get(employee, 'Orzeczenie o niepełnosprawności', 'Disability', 'hasDisabilityCertificate') === 'TAK' || false
+          hiredAt: parseExcelDate(get(employee, 'Data zatrudnienia', 'HiredAt', 'hiredAt')),
+          hasDisabilityCertificate: get(employee, 'Orzeczenie o niepełnosprawności', 'Disability', 'hasDisabilityCertificate') === 'TAK' || false,
+          workHours,
+          overtimeAllowed,
+          nightShiftAllowed
         }),
       });
       if (!res.ok) {

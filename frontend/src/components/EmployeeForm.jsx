@@ -10,10 +10,18 @@ const EmployeeForm = ({ initialData, onSubmit, onCancel }) => {
     email: '',
     hiredAt: '',
     hasDisabilityCertificate: false,
+    workHours: 8,
+    overtimeAllowed: false,
+    nightShiftAllowed: false,
   });
 
   useEffect(() => {
-    if (initialData) setForm(initialData);
+    if (initialData) setForm({
+      ...initialData,
+      workHours: initialData.workHours ?? 8,
+      overtimeAllowed: initialData.overtimeAllowed ?? false,
+      nightShiftAllowed: initialData.nightShiftAllowed ?? false,
+    });
   }, [initialData]);
 
   const handleChange = e => {
@@ -34,6 +42,8 @@ const EmployeeForm = ({ initialData, onSubmit, onCancel }) => {
       // Convert to ISO string (date only, set to midnight UTC)
       submitData.hiredAt = new Date(form.hiredAt).toISOString();
     }
+    // Ensure workHours is a number
+    submitData.workHours = Number(submitData.workHours);
     onSubmit(submitData);
   };
 
@@ -75,6 +85,24 @@ const EmployeeForm = ({ initialData, onSubmit, onCancel }) => {
             <div className="flex items-center mt-6">
               <input id="disability" name="hasDisabilityCertificate" type="checkbox" checked={form.hasDisabilityCertificate} onChange={handleChange} className="mr-2" />
               <label htmlFor="disability" className="text-sm font-semibold">Posiada orzeczenie o niepełnosprawności</label>
+            </div>
+            {/* New fields for work hours and permissions */}
+            <div className="mt-4">
+              <label className="block text-sm font-semibold mb-2">Wymiar pracy</label>
+              <select name="workHours" value={form.workHours || 8} onChange={handleChange} className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base">
+                <option value={8}>8 godzin</option>
+                <option value={7}>7 godzin</option>
+              </select>
+            </div>
+            <div className="mt-4 flex gap-6">
+              <div className="flex items-center">
+                <input id="overtimeAllowed" name="overtimeAllowed" type="checkbox" checked={!!form.overtimeAllowed} onChange={handleChange} className="mr-2" />
+                <label htmlFor="overtimeAllowed" className="text-sm font-semibold">Praca w godzinach nadliczbowych</label>
+              </div>
+              <div className="flex items-center">
+                <input id="nightShiftAllowed" name="nightShiftAllowed" type="checkbox" checked={!!form.nightShiftAllowed} onChange={handleChange} className="mr-2" />
+                <label htmlFor="nightShiftAllowed" className="text-sm font-semibold">Praca w godzinach nocnych</label>
+              </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-semibold mb-2">Telefon</label>

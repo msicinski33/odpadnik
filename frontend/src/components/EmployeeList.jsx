@@ -39,6 +39,12 @@ const EmployeeList = ({ employees, onEdit, onDelete }) => (
                 <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">Orzeczenie o niepełnosprawności</span>
               </div>
             )}
+            {/* New fields for work hours and permissions */}
+            <div className="mt-2 text-xs text-gray-700">
+              Wymiar pracy: <b>{emp.workHours || 8}h</b><br />
+              Praca w godzinach nadliczbowych: <b>{emp.overtimeAllowed ? 'tak' : 'nie'}</b><br />
+              Praca w godzinach nocnych: <b>{emp.nightShiftAllowed ? 'tak' : 'nie'}</b>
+            </div>
             <div className="flex gap-2 mt-3">
               <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEdit(emp)}>
                 <Edit2 className="h-4 w-4 mr-1" /> Edytuj

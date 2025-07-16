@@ -21,7 +21,7 @@ import MonthlySchedule from './pages/MonthlySchedule';
 import DailyPlan from './pages/DailyPlan';
 import AbsenceTypes from './pages/AbsenceTypes';
 import WorkCardPage from './pages/WorkCard';
-import Documents from './pages/Documents';
+import OneTimeOrders from './pages/OneTimeOrders';
 
 const queryClient = new QueryClient();
 
@@ -74,7 +74,7 @@ function App() {
             <Route path="/MonthlySchedule" element={<ProtectedRoute user={user}><MonthlySchedule /></ProtectedRoute>} />
             <Route path="/absence-types" element={<AbsenceTypes />} />
             <Route path="/work-card" element={<ProtectedRoute user={user}><WorkCardPage /></ProtectedRoute>} />
-            <Route path="/documents" element={<ProtectedRoute user={user}><Documents /></ProtectedRoute>} />
+            <Route path="/one-time-orders" element={<ProtectedRoute user={user}><OneTimeOrders /></ProtectedRoute>} />
             <Route path="/users" element={<ProtectedRoute user={user}><Users /></ProtectedRoute>} />
             <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
           </Routes>

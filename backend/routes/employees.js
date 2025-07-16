@@ -18,7 +18,10 @@ router.get('/', async (req, res) => {
         hiredAt: true,
         terminatedAt: true,
         notes: true,
-        hasDisabilityCertificate: true
+        hasDisabilityCertificate: true,
+        workHours: true,
+        overtimeAllowed: true,
+        nightShiftAllowed: true
       }
     });
     res.json(employees);

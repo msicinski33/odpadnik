@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/Checkbox';
-import { Clock, User, Calendar, FileText, Save, Calculator, Moon } from 'lucide-react';
+import { Clock, User, Calendar, FileText, Save, Calculator, Moon, Download } from 'lucide-react';
 
 function pad2(n) { return n < 10 ? '0' + n : n.toString(); }
 function formatNum(n) { return n.toFixed(2).replace('.', ','); }
@@ -407,6 +407,24 @@ export default function WorkCard() {
 
   const holidays = []; // Add holidays as needed
 
+  const handleExportXLSX = async () => {
+    if (!employeeId || !month) return;
+    const url = `/api/work-card/${employeeId}/export-xlsx?month=${month}`;
+    try {
+      const res = await authFetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error('Błąd eksportu XLSX');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = window.URL.createObjectURL(blob);
+      a.download = `work-card-${employeeId}-${month}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      alert('Błąd eksportu XLSX: ' + err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -495,6 +513,11 @@ export default function WorkCard() {
                 <FileText className="h-4 w-4 mr-2" />
                 Eksportuj PDF
               </Button>
+              {employeeId && (
+                <Button variant="outline" onClick={handleExportXLSX} title="Eksportuj do XLSX">
+                  <Download className="w-4 h-4 mr-2" /> XLSX
+                </Button>
+              )}
             </div>
             {selectedEmployee && (
               <div className="mt-4 p-4 bg-muted/50 rounded-lg">

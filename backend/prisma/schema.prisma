@@ -19,10 +19,7 @@ model User {
   isActive  Boolean  @default(true)
   
   // Document relations
-  uploadedDocuments Document[] @relation("DocumentUploader")
-  deletedDocuments  Document[] @relation("DocumentDeleter")
-  uploadedAttachments DocumentAttachment[] @relation("AttachmentUploader")
-  annotations       DocumentAnnotation[] @relation("AnnotationUser")
+  oneTimeOrdersReceived OneTimeOrder[] @relation("ReceivedByUser")
 }
 
 model Employee {
@@ -36,6 +33,9 @@ model Employee {
   terminatedAt DateTime?
   notes     String?
   hasDisabilityCertificate Boolean @default(false)
+  workHours               Int     @default(8) // 7 or 8
+  overtimeAllowed         Boolean @default(false)
+  nightShiftAllowed       Boolean @default(false)
   employeeSchedules EmployeeSchedule[]
   drivenAssignments DailyAssignment[] @relation("DriverAssignments")
   assistantAssignments DailyAssignmentAssistant[]
@@ -54,6 +54,8 @@ model Vehicle {
   faultStatus       String  @default("operational") // "operational" | "faulty"
   dailyAssignments DailyAssignment[]
   faultReports     VehicleFaultReport[]
+  deliveryVehicle   OneTimeOrder[] @relation("DeliveryVehicle")
+  pickupVehicle     OneTimeOrder[] @relation("PickupVehicle")
 }
 
 model Region {
@@ -256,60 +258,38 @@ model WorkCardEntry {
   @@unique([employeeId, date])
 }
 
-model Document {
-  id              Int      @id @default(autoincrement())
-  contractNumber  String?
-  parties         String   // e.g., "Your Company – XYZ Ltd."
-  description     String?
-  tags            String?  // comma-separated tags
-  fileName        String   // original filename
-  filePath        String   // path to stored file
-  fileSize        Int      // file size in bytes
-  mimeType        String   // e.g., "application/pdf"
-  uploadedBy      Int
-  uploadedAt      DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  isDeleted       Boolean  @default(false)
-  deletedBy       Int?
-  deletedAt       DateTime?
+// --- One-Time Orders Outside the Contract ---
 
-  uploader        User     @relation("DocumentUploader", fields: [uploadedBy], references: [id])
-  deleter         User?    @relation("DocumentDeleter", fields: [deletedBy], references: [id])
-  attachments     DocumentAttachment[]
-  annotations     DocumentAnnotation[]
+enum OrderStatus {
+  AWAITING_EXECUTION
+  CONTAINER_DELIVERED
+  AWAITING_COMPLETION
+  COMPLETED
+  CANCELLED
 }
 
-model DocumentAttachment {
-  id          Int      @id @default(autoincrement())
-  documentId  Int
-  fileName    String   // original filename
-  filePath    String   // path to stored file
-  fileSize    Int      // file size in bytes
-  mimeType    String   // e.g., "image/jpeg", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  uploadedBy  Int
-  uploadedAt  DateTime @default(now())
-  isDeleted   Boolean  @default(false)
-
-  document    Document @relation(fields: [documentId], references: [id])
-  uploader    User     @relation("AttachmentUploader", fields: [uploadedBy], references: [id])
-}
-
-model DocumentAnnotation {
-  id          Int      @id @default(autoincrement())
-  documentId  Int
-  userId      Int
-  type        String   // "highlight", "note", "sticky", "link", "shape", "underline"
-  page        Int      // PDF page number
-  x           Float?   // x coordinate
-  y           Float?   // y coordinate
-  width       Float?   // width of annotation
-  height      Float?   // height of annotation
-  content     String?  // text content for notes
-  color       String?  // color code
-  data        Json?    // additional data (coordinates, text selection, etc.)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  document    Document @relation(fields: [documentId], references: [id])
-  user        User     @relation("AnnotationUser", fields: [userId], references: [id])
+model OneTimeOrder {
+  id                Int         @id @default(autoincrement())
+  dateReceived      DateTime
+  receivedById      Int
+  receivedBy        User        @relation("ReceivedByUser", fields: [receivedById], references: [id])
+  deliveryDate      DateTime
+  pdfFile           String?     // Path to uploaded PDF
+  clientCode        String
+  orderingPerson    String
+  address           String
+  phone             String
+  containerType     String
+  wasteType         String
+  status            OrderStatus @default(AWAITING_EXECUTION)
+  deliveryVehicleId Int?        // Vehicle for delivery
+  deliveryVehicle   Vehicle?    @relation("DeliveryVehicle", fields: [deliveryVehicleId], references: [id])
+  pickupVehicleId   Int?        // Vehicle for pickup
+  pickupVehicle     Vehicle?    @relation("PickupVehicle", fields: [pickupVehicleId], references: [id])
+  pickupDate        DateTime?
+  invoiceNumber     String?
+  completedAt       DateTime?
+  notes             String?     // Uwagi
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 } 
