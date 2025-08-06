@@ -307,18 +307,6 @@ export default function MonthlySchedulePdf({ employees, schedule, month, userNam
             <span>22-6</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '14px', height: '14px', backgroundColor: '#ffffff', border: '1px solid #ccc' }}></div>
-            <span>6-13* (dla osób z orzeczeniem)</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '14px', height: '14px', backgroundColor: '#fef3c7', border: '1px solid #ccc' }}></div>
-            <span>14-21* (dla osób z orzeczeniem)</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '14px', height: '14px', backgroundColor: '#e9d5ff', border: '1px solid #ccc' }}></div>
-            <span>22-5* (dla osób z orzeczeniem)</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: '14px', height: '14px', backgroundColor: '#fee2e2', border: '1px solid #ccc' }}></div>
             <span>NU</span>
           </div>
@@ -346,9 +334,6 @@ export default function MonthlySchedulePdf({ employees, schedule, month, userNam
             <div style={{ width: '14px', height: '14px', backgroundColor: '#dcfce7', border: '1px solid #ccc' }}></div>
             <span>Sobota</span>
           </div>
-        </div>
-        <div style={{ marginTop: '8px', fontSize: '10px', fontStyle: 'italic' }}>
-          * - Zmienione godziny dla pracowników z orzeczeniem o niepełnosprawności (7h zamiast 8h)
         </div>
       </div>
 
