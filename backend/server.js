@@ -8,8 +8,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // In-memory lock store: { [date]: { employees: Set, vehicles: Set, ... }, ... }
@@ -70,27 +70,33 @@ const absenceTypesRouter = require('./routes/absenceTypes');
 const workCardRouter = require('./routes/workCard');
 const pdfRoute = require('./routes/pdf');
 const oneTimeOrdersRouter = require('./routes/oneTimeOrders');
-const { authenticateToken } = require('./routes/authMiddleware');
+const debrisBagOrdersRouter = require('./routes/debrisBagOrders');
+const damagesRouter = require('./routes/damages');
+const rolesRouter = require('./routes/roles');
+const { authenticateToken, authorizeModule, attachPermissions } = require('./routes/authMiddleware');
 
 
-app.use('/api/employees', employeesRouter);
+app.use('/api/employees', authenticateToken, attachPermissions, authorizeModule('employees'), employeesRouter);
 app.use('/api/users', usersRoutes);
 app.use('/api/monthlyWork', monthlyWorkRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/vehicles', vehiclesRouter);
-app.use('/api/fractions', fractionsRoutes);
-app.use('/api/regions', regionsRoutes);
-app.use('/api/points', pointsRoutes);
-app.use('/api', pointFractionsRoutes);
-app.use('/api/trasowka', trasowkaRoutes);
-app.use('/api/calendar', calendarRoutes);
-app.use('/api/dailyAssignments', dailyAssignmentsRoutes);
-app.use('/api/municipalities', municipalitiesRouter);
-app.use('/api/absence-types', absenceTypesRouter);
-app.use('/api/work-card', workCardRouter);
-app.use('/api/pdf', pdfRoute);
-app.use('/api/one-time-orders', authenticateToken, oneTimeOrdersRouter);
-app.use('/workorders', workOrdersRouter);
+app.use('/api/vehicles', authenticateToken, attachPermissions, authorizeModule('vehicles'), vehiclesRouter);
+app.use('/api/fractions', authenticateToken, attachPermissions, authorizeModule('fractions'), fractionsRoutes);
+app.use('/api/regions', authenticateToken, attachPermissions, authorizeModule('regions'), regionsRoutes);
+app.use('/api/points', authenticateToken, attachPermissions, authorizeModule('points'), pointsRoutes);
+app.use('/api', authenticateToken, attachPermissions, authorizeModule('points'), pointFractionsRoutes);
+app.use('/api/trasowka', authenticateToken, attachPermissions, authorizeModule('workorders'), trasowkaRoutes);
+app.use('/api/calendar', authenticateToken, attachPermissions, authorizeModule('calendar'), calendarRoutes);
+app.use('/api/dailyAssignments', authenticateToken, attachPermissions, authorizeModule('dailyAssignments'), dailyAssignmentsRoutes);
+app.use('/api/municipalities', authenticateToken, attachPermissions, authorizeModule('regions'), municipalitiesRouter);
+app.use('/api/absence-types', authenticateToken, attachPermissions, authorizeModule('employees'), absenceTypesRouter);
+app.use('/api/work-card', authenticateToken, attachPermissions, authorizeModule('employees'), workCardRouter);
+app.use('/api/pdf', authenticateToken, attachPermissions, authorizeModule('workorders'), pdfRoute);
+app.use('/api/one-time-orders', authenticateToken, attachPermissions, authorizeModule('oneTimeOrders'), oneTimeOrdersRouter);
+app.use('/api/debris-bag-orders', authenticateToken, attachPermissions, authorizeModule('debrisBagOrders'), debrisBagOrdersRouter);
+app.use('/api/damages', authenticateToken, attachPermissions, authorizeModule('damages'), damagesRouter);
+app.use('/api/roles', rolesRouter);
+app.use('/api/workorders', authenticateToken, workOrdersRouter);
 app.use('/api', demoScheduleRouter);
 
 

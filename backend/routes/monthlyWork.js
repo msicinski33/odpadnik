@@ -75,8 +75,32 @@ router.put('/:id', async (req, res) => {
     await transporter.sendMail({
       from: 'ODPADnik <no-reply@odpadnik.pl>',
       to: userEmail,
-      subject: 'Zmiana w miesięcznym planie pracy',
-      text: `Plan został zmodyfikowany.\n\nZmiany:\n${formatChanges(before, after)}`,
+      subject: '📅 Zmiana w miesięcznym planie pracy',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #3b82f6; border-radius: 8px; background-color: #eff6ff;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #1e40af; margin: 0;">📅 PLAN PRACY</h1>
+            <h2 style="color: #1f2937; margin: 10px 0;">Zmiana w harmonogramie</h2>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+            <h3 style="color: #1f2937; margin-top: 0;">Szczegóły zmiany:</h3>
+            <div style="background-color: #f8fafc; padding: 15px; border-radius: 4px; border-left: 4px solid #3b82f6;">
+              <pre style="margin: 0; font-family: Arial, sans-serif; white-space: pre-wrap;">${formatChanges(before, after)}</pre>
+            </div>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; padding: 15px; background-color: #dbeafe; border-radius: 6px;">
+            <p style="margin: 0; color: #1e40af; font-weight: bold;">
+              ⚠️ Plan pracy został zmodyfikowany
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280;">
+            <p>Wiadomość wygenerowana automatycznie przez system ODPADnik</p>
+          </div>
+        </div>
+      `,
     });
     res.json(after);
   } catch (error) {

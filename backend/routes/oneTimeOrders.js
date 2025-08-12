@@ -47,11 +47,90 @@ async function sendStatusEmail(order, newStatus) {
   if (order.orderingPerson && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(order.orderingPerson)) {
     to = order.orderingPerson;
   }
+  
+  // Map status to Polish labels
+  const statusLabels = {
+    'AWAITING_EXECUTION': 'Oczekuje na realizację',
+    'CONTAINER_DELIVERED': 'Kontener dostarczony',
+    'AWAITING_COMPLETION': 'Oczekuje na odbiór',
+    'COMPLETED': 'Zakończone',
+    'CANCELLED': 'Anulowane'
+  };
+  
+  const statusLabel = statusLabels[newStatus] || newStatus;
+  const statusColor = newStatus === 'COMPLETED' ? '#10b981' : 
+                     newStatus === 'CANCELLED' ? '#ef4444' : '#f59e0b';
+  
   const info = await transporter.sendMail({
-    from: 'no-reply@odpadnik.local',
+    from: 'ODPADnik <no-reply@odpadnik.pl>',
     to,
-    subject: `Order #${order.id} status changed to ${newStatus}`,
-    text: `Order #${order.id} for client ${order.clientCode} is now: ${newStatus}\n\nSummary:\nContainer: ${order.containerType}\nWaste: ${order.wasteType}\nAddress: ${order.address}\nOrdered by: ${order.orderingPerson}`,
+    subject: `📋 Zlecenie #${order.id} - Status: ${statusLabel}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid ${statusColor}; border-radius: 8px; background-color: #f8fafc;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: ${statusColor}; margin: 0;">📋 ZLECENIE JEDNORAZOWE</h1>
+          <h2 style="color: #1f2937; margin: 10px 0;">Status: ${statusLabel}</h2>
+        </div>
+        
+        <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+          <h3 style="color: #1f2937; margin-top: 0;">Dane zlecenia:</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Numer zlecenia:</td>
+              <td style="padding: 8px; font-weight: bold; color: ${statusColor};">#${order.id}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Kod klienta:</td>
+              <td style="padding: 8px;">${order.clientCode}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Zleceniodawca:</td>
+              <td style="padding: 8px;">${order.orderingPerson}</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+          <h3 style="color: #1f2937; margin-top: 0;">Szczegóły realizacji:</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Typ kontenera:</td>
+              <td style="padding: 8px;">${order.containerType}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Typ odpadu:</td>
+              <td style="padding: 8px;">${order.wasteType}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Adres:</td>
+              <td style="padding: 8px;">${order.address}</td>
+            </tr>
+            ${order.deliveryVehicle ? `
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Pojazd dostawy:</td>
+              <td style="padding: 8px;">${order.deliveryVehicle.registrationNumber} - ${order.deliveryVehicle.brand}</td>
+            </tr>
+            ` : ''}
+            ${order.pickupVehicle ? `
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Pojazd odbioru:</td>
+              <td style="padding: 8px;">${order.pickupVehicle.registrationNumber} - ${order.pickupVehicle.brand}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; padding: 15px; background-color: ${statusColor}20; border-radius: 6px;">
+          <p style="margin: 0; color: ${statusColor}; font-weight: bold;">
+            Status zlecenia został zaktualizowany: ${statusLabel}
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280;">
+          <p>Wiadomość wygenerowana automatycznie przez system ODPADnik</p>
+        </div>
+      </div>
+    `,
   });
   // For dev: log preview URL if using ethereal
   if (nodemailer.getTestMessageUrl) {
@@ -91,6 +170,126 @@ router.get('/', async (req, res) => {
     });
     res.json(orders);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /one-time-orders/pending-pdf - Generate PDF with all pending orders
+router.get('/pending-pdf', async (req, res) => {
+  try {
+    // Get all pending orders (not completed or cancelled)
+    const pendingOrders = await prisma.oneTimeOrder.findMany({
+      where: {
+        status: {
+          notIn: ['COMPLETED', 'CANCELLED']
+        }
+      },
+      include: {
+        receivedBy: { select: { name: true } },
+        deliveryVehicle: { select: { registrationNumber: true, brand: true } },
+        pickupVehicle: { select: { registrationNumber: true, brand: true } },
+      },
+      orderBy: [
+        { status: 'asc' },
+        { deliveryDate: 'asc' }
+      ]
+    });
+
+    if (pendingOrders.length === 0) {
+      return res.status(404).json({ error: 'Brak oczekujących zleceń' });
+    }
+
+    const STATUS_LABELS = {
+      'AWAITING_EXECUTION': 'Oczekuje na realizację',
+      'CONTAINER_DELIVERED': 'Kontener dostarczony',
+      'AWAITING_COMPLETION': 'Oczekuje na odbiór',
+    };
+
+    const formatDate = d => d ? new Date(d).toLocaleDateString('pl-PL') : '-';
+
+    // Group orders by status
+    const ordersByStatus = pendingOrders.reduce((acc, order) => {
+      const status = order.status;
+      if (!acc[status]) acc[status] = [];
+      acc[status].push(order);
+      return acc;
+    }, {});
+
+    const html = `
+      <div style="font-family: 'Noto Sans', Arial, sans-serif; color: #222; font-size: 13px; width: 100%;">
+        <div style="border-bottom: 2px solid #0ea5e9; padding-bottom: 12px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="font-weight: 700; font-size: 22px; color: #0ea5e9;">ODPADnik</div>
+          <div style="font-weight: 700; font-size: 18px;">Lista oczekujących zleceń jednorazowych</div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <div style="font-weight: 600; font-size: 16px; margin-bottom: 8px;">Podsumowanie</div>
+          <div>Łączna liczba oczekujących zleceń: <b>${pendingOrders.length}</b></div>
+          <div>Data wygenerowania: <b>${formatDate(new Date())}</b></div>
+        </div>
+
+        ${Object.entries(ordersByStatus).map(([status, orders]) => `
+          <div style="margin-bottom: 30px; page-break-inside: avoid;">
+            <div style="font-weight: 700; font-size: 16px; color: #0ea5e9; margin-bottom: 12px; padding: 8px; background-color: #f0f9ff; border-left: 4px solid #0ea5e9;">
+              ${STATUS_LABELS[status]} (${orders.length} zleceń)
+            </div>
+            
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+              <thead>
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Nr</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Kod klienta</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Zleceniodawca</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Adres</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Telefon</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Kontener</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Data dostawy</th>
+                  <th style="padding: 8px; text-align: left; font-weight: 600; border: 1px solid #e2e8f0;">Pojazd</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${orders.map((order, index) => `
+                  <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: 600;">${order.id}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.clientCode}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.orderingPerson}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.address}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.phone}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.containerType}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${formatDate(order.deliveryDate)}</td>
+                    <td style="padding: 8px; border: 1px solid #e2e8f0;">${order.deliveryVehicle ? `${order.deliveryVehicle.registrationNumber}${order.deliveryVehicle.brand ? ' - ' + order.deliveryVehicle.brand : ''}` : '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `).join('')}
+
+        <div style="margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <div style="font-size: 12px; color: #888;">Sporządził:</div>
+            <div style="border-bottom: 1px solid #bbb; width: 220px; height: 28px;"></div>
+          </div>
+          <div style="font-size: 11px; color: #aaa;">Wygenerowano: ${formatDate(new Date())}</div>
+        </div>
+      </div>
+    `;
+
+    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ 
+      format: 'A4', 
+      printBackground: true, 
+      margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' } 
+    });
+    await browser.close();
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=pending-orders-${formatDate(new Date()).replace(/\./g, '-')}.pdf`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('Pending orders PDF error:', err);
     res.status(500).json({ error: err.message });
   }
 });

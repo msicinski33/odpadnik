@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import authFetch from "../utils/authFetch";
-import { format, addDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, addDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Button } from "../components/ui/button";
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "../components/ui/select";
-import MultiSelect from "../components/ui/MultiSelect";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -14,12 +13,12 @@ import { pl } from "date-fns/locale";
 import { toast } from "sonner";
 import { UserContext } from "../UserContext";
 
-const shifts = [
+  const shifts = [
   { id: "6-14", label: "Zmiana poranna", time: "6:00 - 14:00", color: "bg-blue-100 text-blue-800 border-blue-200" },
   { id: "7-15", label: "Zmiana poranna (7-15)", time: "7:00 - 15:00", color: "bg-blue-100 text-blue-800 border-blue-200" },
   { id: "14-22", label: "Zmiana popołudniowa", time: "14:00 - 22:00", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
   { id: "22-6", label: "Zmiana nocna", time: "22:00 - 6:00", color: "bg-purple-100 text-purple-800 border-purple-200" },
-  { id: "NU", label: "Nieobecność", time: "Wolne", color: "bg-red-100 text-red-800 border-red-200" },
+  { id: "NU", label: "NU", time: "Wg wymiaru pracy", color: "bg-red-100 text-red-800 border-red-200" },
   { id: "D1", label: "D1", time: "6:00 - 14:00", color: "bg-red-100 text-red-800 border-red-200" },
   { id: "D2", label: "D2", time: "14:00 - 22:00", color: "bg-red-100 text-red-800 border-red-200" },
   { id: "D3", label: "D3", time: "22:00 - 6:00", color: "bg-red-100 text-red-800 border-red-200" },
@@ -68,6 +67,52 @@ export default function MonthlySchedule(props) {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [mismatchedEmployees, setMismatchedEmployees] = useState([]);
   const [pendingSave, setPendingSave] = useState(false);
+  const [nightShiftViolations, setNightShiftViolations] = useState([]);
+
+  // Helpers to determine working shifts and calculate employee hours
+  function isCustomTimeShift(shift) {
+    if (!shift || typeof shift !== 'string') return false;
+    // Matches formats like 5-13, 07-15, 7:30-15:30
+    return /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(shift);
+  }
+
+  function isWorkingShift(shift) {
+    if (!shift) return false;
+    // Exclude only on-call/home duty
+    if (["D1", "D2", "D3"].includes(shift)) return false;
+    // Standard shifts or any custom time range
+    return ["6-14", "7-15", "14-22", "22-6", "NU"].includes(shift) || isCustomTimeShift(shift);
+  }
+
+  function parseCustomShiftHours(shift) {
+    // Parse only if minutes present to support fractional hours accurately
+    if (!shift || shift.indexOf(':') === -1) return null;
+    const match = shift.match(/^(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    const fromH = parseInt(match[1], 10);
+    const fromM = match[2] ? parseInt(match[2], 10) : 0;
+    const toH = parseInt(match[3], 10);
+    const toM = match[4] ? parseInt(match[4], 10) : 0;
+    let fromMin = fromH * 60 + fromM;
+    let toMin = toH * 60 + toM;
+    if (toMin <= fromMin) toMin += 24 * 60; // overnight
+    const diffHours = (toMin - fromMin) / 60;
+    return diffHours;
+  }
+
+  function getShiftHoursForEmployee(employee, shift) {
+    if (!shift) return 0;
+    if (["D1", "D2", "D3"].includes(shift)) return 0;
+    const hoursPerDay = typeof employee?.workHours === 'number'
+      ? employee.workHours
+      : (employee?.hasDisabilityCertificate ? 7 : 8);
+    if (shift === 'NU') return hoursPerDay;
+    if (["6-14", "7-15", "14-22", "22-6"].includes(shift)) return hoursPerDay;
+    const parsed = parseCustomShiftHours(shift);
+    if (parsed !== null) return parsed;
+    // Fallback for simple H-H custom without minutes: treat as standard day length
+    return hoursPerDay;
+  }
 
   // Funkcja do obliczania godzin dla pracownika
   function getEmployeeHours(empId) {
@@ -76,13 +121,36 @@ export default function MonthlySchedule(props) {
     const employee = employees.find(emp => emp.id === empId);
     days.forEach(day => {
       const shift = schedule[empId][day];
-      if (["6-14", "7-15", "14-22", "22-6", "CUSTOM", "NU"].includes(shift)) {
-        // Employees with disability certificates work 7 hours instead of 8
-        total += employee?.hasDisabilityCertificate ? 7 : 8;
-      }
-      // D1, D2, D3 = 0h (nieobecność)
+      total += getShiftHoursForEmployee(employee, shift);
+      // NU, D1, D2, D3 = 0h (nieobecność/dyżur domowy)
     });
     return total;
+  }
+
+  // Helper to detect if a shift is a night shift (22:00-6:00 window)
+  function isNightShift(shift) {
+    if (!shift) return false;
+    // Standard night shifts
+    if (["22-6", "D3"].includes(shift)) return true;
+    // Custom hours: e.g. "23-7", "21-5", "22-5", etc.
+    const match = shift.match(/^(\d{1,2})(?::\d{2})?-(\d{1,2})(?::\d{2})?$/);
+    if (match) {
+      let from = parseInt(match[1], 10);
+      let to = parseInt(match[2], 10);
+      // If to <= from, it means overnight (e.g. 22-6)
+      if (from === 22 || to === 6) return true;
+      // If shift covers any part of 22:00-6:00
+      // Normalize to 0-23, handle overnight
+      let hours = [];
+      if (to > from) {
+        for (let h = from; h < to; h++) hours.push(h % 24);
+      } else {
+        for (let h = from; h < 24; h++) hours.push(h);
+        for (let h = 0; h < to; h++) hours.push(h);
+      }
+      return hours.some(h => h >= 22 || h < 6);
+    }
+    return false;
   }
 
   // Zmodyfikowana funkcja zapisu
@@ -90,10 +158,23 @@ export default function MonthlySchedule(props) {
     const monthIdx = month.getMonth();
     const standardRequired = requiredHours2025[monthIdx];
     const mismatches = employees.filter(emp => {
-      const required = emp.hasDisabilityCertificate ? Math.round(standardRequired * 7 / 8) : standardRequired;
+      const hoursPerDay = typeof emp.workHours === 'number' ? emp.workHours : (emp.hasDisabilityCertificate ? 7 : 8);
+      const required = Math.round(standardRequired * (hoursPerDay / 8));
       return getEmployeeHours(emp.id) !== required;
     });
-    if (mismatches.length > 0) {
+    // Night shift violations
+    const nightViolators = [];
+    employees.forEach(emp => {
+      if (emp.nightShiftAllowed) return;
+      const daysMap = schedule[emp.id] || {};
+      Object.entries(daysMap).forEach(([date, shift]) => {
+        if (isNightShift(shift)) {
+          nightViolators.push({ emp, date, shift });
+        }
+      });
+    });
+    setNightShiftViolations(nightViolators);
+    if (mismatches.length > 0 || nightViolators.length > 0) {
       setMismatchedEmployees(mismatches);
       setShowWarningModal(true);
       setPendingSave(true);
@@ -400,12 +481,7 @@ export default function MonthlySchedule(props) {
 
   // Compute unique positions from all employees
   const allPositions = Array.from(new Set((allEmployees.length ? allEmployees : []).map(e => e.position).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pl'));
-  const TABS = [{ key: 'ALL', label: 'Wszyscy pracownicy' }, ...allPositions.map(pos => ({ key: pos, label: pos }))];
-  const [activeTab, setActiveTab] = useState('ALL');
-
-  useEffect(() => {
-    setSelectedPositions(activeTab === 'ALL' ? [] : [activeTab]);
-  }, [activeTab]);
+  // Multi-select via clickable buttons (no dropdown). selectedPositions already holds array of positions
 
   // Add Polish day abbreviations
   const polishDayShort = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'];
@@ -464,22 +540,56 @@ export default function MonthlySchedule(props) {
                 </Select>
               </div>
 
-              {/* Position MultiSelect */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Filtruj po stanowisku</Label>
-                <MultiSelect
-                  options={allPositions.map(pos => ({ value: pos, label: pos }))}
-                  value={selectedPositions}
-                  onChange={setSelectedPositions}
-                  placeholder="Wszystkie stanowiska"
-                  className="w-64"
-                />
-              </div>
+              {/* Position filter moved to buttons below; removed dropdown */}
 
               {/* Save Button */}
               <Button onClick={handleSave} disabled={isLoading} className="ml-auto">
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? "Zapisywanie..." : "Zapisz grafik"}
+              </Button>
+
+              {/* Copy from previous month */}
+              <Button 
+                onClick={async () => {
+                  if (!window.confirm('Skopiować grafik z poprzedniego miesiąca dla wybranych pracowników? Istniejące wpisy w bieżącym miesiącu mogą zostać nadpisane.')) return;
+                  setIsLoading(true);
+                  try {
+                    const prev = subMonths(month, 1);
+                    const prevMonthStr = format(prev, 'yyyy-MM');
+                    const currentYear = month.getFullYear();
+                    const currentMonth = month.getMonth();
+                    const lastDay = endOfMonth(month).getDate();
+                    // Clone existing schedule to preserve any already set values unless overwritten
+                    const newSchedule = { ...schedule };
+                    const targetEmployees = filteredEmployees.length > 0 ? filteredEmployees : employees;
+                    await Promise.all(targetEmployees.map(async (emp) => {
+                      // Ensure object exists
+                      if (!newSchedule[emp.id]) newSchedule[emp.id] = {};
+                      const res = await authFetch(`/api/employees/${emp.id}/schedule?month=${prevMonthStr}`);
+                      const prevShifts = await res.json();
+                      prevShifts.forEach(s => {
+                        const d = new Date(s.date);
+                        const dayNum = d.getUTCDate ? d.getUTCDate() : d.getDate();
+                        if (dayNum <= lastDay) {
+                          const dateStr = format(new Date(currentYear, currentMonth, dayNum), 'yyyy-MM-dd');
+                          newSchedule[emp.id][dateStr] = s.shift;
+                        }
+                      });
+                    }));
+                    setSchedule(newSchedule);
+                    toast.success('Skopiowano grafik z poprzedniego miesiąca. Zapisz, aby utrwalić zmiany.');
+                  } catch (e) {
+                    console.error('Copy from previous month failed', e);
+                    toast.error('Nie udało się skopiować grafiku.');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                disabled={isLoading || employees.length === 0}
+                variant="outline"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Kopiuj z poprzedniego miesiąca
               </Button>
               
               {/* PDF Export Button */}
@@ -495,7 +605,7 @@ export default function MonthlySchedule(props) {
           </CardContent>
         </Card>
 
-        {/* Position Tabs */}
+        {/* Position Buttons (multi-select) */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -505,16 +615,31 @@ export default function MonthlySchedule(props) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {TABS.map(tab => (
-                <Button
-                  key={tab.key}
-                  variant={activeTab === tab.key ? "default" : "outline"}
-                  onClick={() => setActiveTab(tab.key)}
-                  className="transition-all duration-200"
-                >
-                  {tab.label}
-                </Button>
-              ))}
+              <Button
+                variant={selectedPositions.length === 0 ? "default" : "outline"}
+                onClick={() => setSelectedPositions([])}
+                className="transition-all duration-200"
+              >
+                Wszyscy pracownicy
+              </Button>
+              {allPositions.map(pos => {
+                const isActive = selectedPositions.includes(pos);
+                return (
+                  <Button
+                    key={pos}
+                    variant={isActive ? "default" : "outline"}
+                    onClick={() => {
+                      setSelectedPositions(prev => {
+                        if (prev.includes(pos)) return prev.filter(p => p !== pos);
+                        return [...prev, pos];
+                      });
+                    }}
+                    className="transition-all duration-200"
+                  >
+                    {pos}
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -763,24 +888,46 @@ export default function MonthlySchedule(props) {
 
         {/* Warning Modal */}
         <Dialog open={showWarningModal} onOpenChange={setShowWarningModal}>
-          <DialogContent className="max-h-[70vh]">
+          <DialogContent className="max-w-2xl p-2 sm:p-4" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
             <DialogHeader>
-              <DialogTitle>Ostrzeżenie: Niezgodność godzin pracy</DialogTitle>
+              <DialogTitle>Ostrzeżenie: Niezgodność godzin pracy lub niedozwolona zmiana nocna</DialogTitle>
               <DialogDescription>
-                U niektórych pracowników liczba przypisanych godzin nie zgadza się z wymiarem czasu pracy dla tego miesiąca ({requiredHours2025[month.getMonth()]}h).<br />
-                <ul className="mt-2 mb-4 list-disc list-inside text-sm overflow-y-auto max-h-[50vh] pr-2">
-                  {mismatchedEmployees.map(emp => {
-                    const empHours = getEmployeeHours(emp.id);
-                    const required = requiredHours2025[month.getMonth()];
-                    const diff = empHours - required;
-                    return (
-                      <li key={emp.id}>
-                        {emp.surname} {emp.name}: {empHours}h (
-                        {diff > 0 ? `za dużo godzin o ${diff}` : `za mało godzin o ${-diff}`})
-                      </li>
-                    );
-                  })}
-                </ul>
+                 {mismatchedEmployees.length > 0 && (
+                  <>
+                    U niektórych pracowników liczba przypisanych godzin nie zgadza się z wymiarem czasu pracy dla tego miesiąca.<br />
+                    <div style={{ maxHeight: '30vh', overflowY: 'auto', fontSize: '13px', marginBottom: 8 }}>
+                      <ul className="mt-2 mb-4 list-disc list-inside text-sm pr-2">
+                        {mismatchedEmployees.map(emp => {
+                          const empHours = getEmployeeHours(emp.id);
+                           const base = requiredHours2025[month.getMonth()];
+                           const hoursPerDay = typeof emp.workHours === 'number' ? emp.workHours : (emp.hasDisabilityCertificate ? 7 : 8);
+                           const required = Math.round(base * (hoursPerDay / 8));
+                          const diff = empHours - required;
+                          return (
+                            <li key={emp.id}>
+                               {emp.surname} {emp.name}: {empHours}h / wymagane {required}h (
+                              {diff > 0 ? `za dużo godzin o ${diff}` : `za mało godzin o ${-diff}`})
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </>
+                )}
+                {nightShiftViolations.length > 0 && (
+                  <>
+                    <div className="mb-2">Niektórzy pracownicy mają przypisane zmiany nocne, mimo że nie mają do tego uprawnień:</div>
+                    <div style={{ maxHeight: '30vh', overflowY: 'auto', fontSize: '13px', marginBottom: 8 }}>
+                      <ul className="mb-4 list-disc list-inside text-sm pr-2">
+                        {nightShiftViolations.map((v, idx) => (
+                          <li key={v.emp.id + v.date + v.shift + idx}>
+                            {v.emp.surname} {v.emp.name} – {v.date} ({v.shift})
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
                 Czy na pewno chcesz zapisać grafik mimo niezgodności?
               </DialogDescription>
             </DialogHeader>

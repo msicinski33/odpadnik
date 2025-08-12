@@ -1,0 +1,28 @@
+-- CreateTable
+CREATE TABLE "DebrisBagOrder" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "clientRecordNumber" TEXT NOT NULL,
+    "clientName" TEXT NOT NULL,
+    "clientPhone" TEXT NOT NULL,
+    "clientAddress" TEXT NOT NULL,
+    "renovationAddress" TEXT NOT NULL,
+    "paymentType" TEXT NOT NULL,
+    "paymentAmount" REAL,
+    "orderNumber" TEXT NOT NULL,
+    "dateReceived" DATETIME NOT NULL,
+    "numberOfBags" INTEGER NOT NULL,
+    "bagType" TEXT NOT NULL,
+    "bagNumber" TEXT,
+    "price" REAL,
+    "notes" TEXT,
+    "serviceExecutionDate" DATETIME,
+    "kpoNumber" TEXT,
+    "vehicleId" INTEGER,
+    "bagsCollected" INTEGER,
+    "invoiceIssueDate" DATETIME,
+    "invoiceNumber" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'PENDING_COMPLETION',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "DebrisBagOrder_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);

@@ -82,11 +82,10 @@ function getShiftLabelWithDisability(shift, hasDisabilityCertificate) {
 }
 
 function getShiftColor(shift) {
-  if (shift === '6-14' || shift === '7-15') return '#ffffff';
+  if (shift === '6-14' || shift === '7-15' || shift === 'NU') return '#ffffff';
   const colorMap = {
     '14-22': '#fef3c7',
     '22-6': '#e9d5ff',
-    'NU': '#fee2e2',
     'D1': '#fee2e2',
     'D2': '#fee2e2',
     'D3': '#fee2e2',
@@ -165,15 +164,50 @@ export default function MonthlySchedulePdf({ employees, schedule, month, userNam
     if (isWorkingDay(dateStr)) workingDays++;
   }
 
+  // Helpers for recognizing shifts
+  function isCustomTimeShift(shift) {
+    if (!shift || typeof shift !== 'string') return false;
+    return /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(shift);
+  }
+  function isWorkingShift(shift) {
+    if (!shift) return false;
+    if (['D1', 'D2', 'D3'].includes(shift)) return false;
+    return ['6-14', '7-15', '14-22', '22-6', 'NU'].includes(shift) || isCustomTimeShift(shift);
+  }
+
+  function parseCustomShiftHours(shift) {
+    if (!shift || shift.indexOf(':') === -1) return null;
+    const match = shift.match(/^(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    const fromH = parseInt(match[1], 10);
+    const fromM = match[2] ? parseInt(match[2], 10) : 0;
+    const toH = parseInt(match[3], 10);
+    const toM = match[4] ? parseInt(match[4], 10) : 0;
+    let fromMin = fromH * 60 + fromM;
+    let toMin = toH * 60 + toM;
+    if (toMin <= fromMin) toMin += 24 * 60;
+    return (toMin - fromMin) / 60;
+  }
+
+  function getShiftHoursForEmployee(employee, shift) {
+    if (!shift) return 0;
+    if (['D1', 'D2', 'D3'].includes(shift)) return 0;
+    const hoursPerDay = typeof employee?.workHours === 'number'
+      ? employee.workHours
+      : (employee?.hasDisabilityCertificate ? 7 : 8);
+    if (shift === 'NU') return hoursPerDay;
+    if (['6-14', '7-15', '14-22', '22-6'].includes(shift)) return hoursPerDay;
+    const parsed = parseCustomShiftHours(shift);
+    if (parsed !== null) return parsed;
+    return hoursPerDay;
+  }
+
   // Calculate total hours for each employee
   const employeeTotals = employees.map(emp => {
     let totalHours = 0;
     days.forEach(day => {
       const shift = schedule[emp.id]?.[day.dateStr];
-      if (shift && ['6-14', '7-15', '14-22', '22-6', 'CUSTOM', 'NU'].includes(shift)) {
-        // Employees with disability certificates work 7 hours instead of 8
-        totalHours += emp.hasDisabilityCertificate ? 7 : 8;
-      }
+      totalHours += getShiftHoursForEmployee(emp, shift);
     });
     return { employeeId: emp.id, totalHours };
   });
@@ -267,7 +301,7 @@ export default function MonthlySchedulePdf({ employees, schedule, month, userNam
                       <div style={{ 
                         fontSize: '11px',
                         fontWeight: 'bold',
-                        color: shift === 'NU' ? '#dc2626' : '#000',
+                        color: '#000',
                         whiteSpace: 'nowrap'
                       }}>
                         {getShiftLabelWithDisability(shift, emp.hasDisabilityCertificate)}
@@ -307,8 +341,8 @@ export default function MonthlySchedulePdf({ employees, schedule, month, userNam
             <span>22-6</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <div style={{ width: '14px', height: '14px', backgroundColor: '#fee2e2', border: '1px solid #ccc' }}></div>
-            <span>NU</span>
+            <div style={{ width: '14px', height: '14px', backgroundColor: '#ffffff', border: '1px solid #ccc' }}></div>
+            <span>NU (wg etatu)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: '14px', height: '14px', backgroundColor: '#fee2e2', border: '1px solid #ccc' }}></div>

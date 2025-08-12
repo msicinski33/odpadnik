@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 
-export default function MultiSelect({ options, value, onChange, placeholder = "Wybierz...", className = "" }) {
+export default function MultiSelect({ options, value, onChange, placeholder = "Wybierz...", className = "", summaryThreshold = Infinity }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -38,23 +38,39 @@ export default function MultiSelect({ options, value, onChange, placeholder = "W
         )}
         {value.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {options.filter(opt => value.includes(opt.value)).map(opt => (
-              <span key={opt.value} className="bg-blue-100 text-blue-800 rounded px-2 py-0.5 text-xs flex items-center">
-                {opt.label}
+            {value.length > summaryThreshold ? (
+              <>
+                <span className="bg-blue-100 text-blue-800 rounded px-2 py-0.5 text-xs flex items-center">
+                  Wybrano {value.length}
+                </span>
                 <button
-                  className="ml-1 text-blue-600 hover:text-red-500 focus:outline-none"
-                  onClick={e => { e.stopPropagation(); onChange(value.filter(v => v !== opt.value)); }}
+                  className="ml-2 text-xs text-gray-500 hover:text-red-500"
+                  onClick={clearAll}
                   tabIndex={-1}
-                  aria-label={`Usuń ${opt.label}`}
-                >×</button>
-              </span>
-            ))}
-            <button
-              className="ml-2 text-xs text-gray-500 hover:text-red-500"
-              onClick={clearAll}
-              tabIndex={-1}
-              aria-label="Wyczyść wszystko"
-            >Wyczyść</button>
+                  aria-label="Wyczyść wszystko"
+                >Wyczyść</button>
+              </>
+            ) : (
+              <>
+                {options.filter(opt => value.includes(opt.value)).map(opt => (
+                  <span key={opt.value} className="bg-blue-100 text-blue-800 rounded px-2 py-0.5 text-xs flex items-center">
+                    {opt.label}
+                    <button
+                      className="ml-1 text-blue-600 hover:text-red-500 focus:outline-none"
+                      onClick={e => { e.stopPropagation(); onChange(value.filter(v => v !== opt.value)); }}
+                      tabIndex={-1}
+                      aria-label={`Usuń ${opt.label}`}
+                    >×</button>
+                  </span>
+                ))}
+                <button
+                  className="ml-2 text-xs text-gray-500 hover:text-red-500"
+                  onClick={clearAll}
+                  tabIndex={-1}
+                  aria-label="Wyczyść wszystko"
+                >Wyczyść</button>
+              </>
+            )}
           </div>
         )}
         <span className="ml-auto text-gray-400 text-xs">▼</span>

@@ -2,23 +2,26 @@ import React, { useContext } from 'react';
 import { HomeIcon, UsersIcon, TruckIcon, MapIcon, RectangleGroupIcon, ChartBarIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon, ClipboardDocumentListIcon, HeartIcon, ShieldCheckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { NavLink } from 'react-router-dom';
 import { UserContext } from '../UserContext';
+import { hasPermission } from '../lib/utils';
 
 const navItems = [
-  { name: 'Panel', to: '/dashboard', icon: HomeIcon },
-  { name: 'Pracownicy', to: '/employees', icon: UsersIcon },
-  { name: 'Pojazdy', to: '/vehicles', icon: TruckIcon },
-  { name: 'Punkty', to: '/punkty', icon: MapIcon },
-  { name: 'Regiony', to: '/regions', icon: RectangleGroupIcon },
-  { name: 'Frakcje', to: '/fractions', icon: ChartBarIcon },
-  { name: 'Rodzaje absencji', to: '/absence-types', icon: HeartIcon },
-  { name: 'Harmonogram', to: '/waste-calendar-demo', icon: CalendarIcon },
-  { name: 'Zlecenia', to: '/WorkOrders', icon: ClipboardDocumentListIcon },
-  { name: 'Jednorazowe zlecenia', to: '/one-time-orders', icon: ClipboardDocumentListIcon },
-  { name: 'Profil', to: '/profile', icon: UserCircleIcon },
+  { name: 'Panel', to: '/dashboard', icon: HomeIcon, perm: null },
+  { name: 'Pracownicy', to: '/employees', icon: UsersIcon, perm: 'employees:read' },
+  { name: 'Pojazdy', to: '/vehicles', icon: TruckIcon, perm: 'vehicles:read' },
+  { name: 'Punkty', to: '/punkty', icon: MapIcon, perm: 'points:read' },
+  { name: 'Regiony', to: '/regions', icon: RectangleGroupIcon, perm: 'regions:read' },
+  { name: 'Frakcje', to: '/fractions', icon: ChartBarIcon, perm: 'fractions:read' },
+  { name: 'Rodzaje absencji', to: '/absence-types', icon: HeartIcon, perm: 'employees:read' },
+  { name: 'Harmonogram', to: '/waste-calendar-demo', icon: CalendarIcon, perm: 'calendar:read' },
+  { name: 'Zlecenia', to: '/WorkOrders', icon: ClipboardDocumentListIcon, perm: 'workorders:read' },
+  { name: 'Jednorazowe zlecenia', to: '/one-time-orders', icon: ClipboardDocumentListIcon, perm: 'oneTimeOrders:read' },
+  { name: 'Worki gruzowe', to: '/debris-bag-orders', icon: DocumentTextIcon, perm: 'debrisBagOrders:read' },
+  { name: 'Profil', to: '/profile', icon: UserCircleIcon, perm: null },
 ];
 
 const systemItems = [
-  { name: 'Ustawienia', icon: Cog6ToothIcon },
+  { name: 'Ustawienia', to: '/settings', icon: Cog6ToothIcon, perm: 'users:read' },
+  { name: 'Role i uprawnienia', to: '/roles', icon: ShieldCheckIcon, perm: 'users:read' },
 ];
 
 const AppSidebar = ({ handleLogout }) => {
@@ -30,11 +33,10 @@ const AppSidebar = ({ handleLogout }) => {
       <div className="flex items-center gap-3 px-6 py-6 border-b border-slate-800">
         <div className="relative">
           <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center">
-            <div className="w-5 h-5 border-2 border-white rounded-full relative">
-              <div className="absolute top-0.5 left-0.5 w-1 h-1 bg-white rounded-full"></div>
-              <div className="absolute top-0.5 right-0.5 w-1 h-1 bg-white rounded-full"></div>
-              <div className="absolute bottom-0.5 left-1 right-1 h-0.5 bg-white rounded"></div>
-            </div>
+            {/* Trash Bin Icon */}
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
           </div>
         </div>
         <div>
@@ -50,7 +52,7 @@ const AppSidebar = ({ handleLogout }) => {
             NAWIGACJA
           </div>
           <div className="space-y-1">
-            {navItems.map((item) => (
+            {navItems.filter(item => !item.perm || hasPermission(user, item.perm)).map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -81,14 +83,17 @@ const AppSidebar = ({ handleLogout }) => {
               SYSTEM
             </div>
             <div className="space-y-1">
-              {systemItems.map((item) => (
-                <button
+              {systemItems.filter(item => !item.perm || hasPermission(user, item.perm)).map((item) => (
+                <NavLink
                   key={item.name}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all duration-200"
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`
+                  }
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   <span className="truncate">{item.name}</span>
-                </button>
+                </NavLink>
               ))}
               {/* Admin only - User Management */}
               {user?.role === 'admin' && (

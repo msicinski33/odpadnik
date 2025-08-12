@@ -31,8 +31,12 @@ router.post('/login', async (req, res) => {
     if (!user.isActive) return res.status(401).json({ error: 'Konto zostało zablokowane. Skontaktuj się z administratorem.' });
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name, avatarUrl: user.avatarUrl || null },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, avatarUrl: user.avatarUrl || null } });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

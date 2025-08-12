@@ -88,14 +88,23 @@ const Vehicles = () => {
 
   const handleImport = async (data) => {
     try {
-      // For now, we'll create vehicles one by one
-      const promises = data.map(vehicle => 
+      // Map Excel columns to backend fields
+      const mapped = data.map(vehicle => ({
+        brand: vehicle['Marka'],
+        registrationNumber: vehicle['Numer rejestracyjny'],
+        vehicleType: vehicle['Typ'],
+        capacity: vehicle['Pojemność'],
+        fuelType: vehicle['Rodzaj paliwa'],
+        isActive: (vehicle['Aktywny'] || '').toString().trim().toLowerCase() === 'tak'
+      }));
+
+      const promises = mapped.map(vehicle =>
         authFetch('http://localhost:3000/api/vehicles', {
           method: 'POST',
           body: JSON.stringify(vehicle)
         })
       );
-      
+
       await Promise.all(promises);
       setAlert({ type: 'success', message: `Pomyślnie zaimportowano ${data.length} pojazdów do floty.` });
       refetch();

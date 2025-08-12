@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
     const workOrders = await prisma.workOrder.findMany({ where, orderBy: { executionDate: 'asc' } });
     res.json(workOrders);
   } catch (err) {
+    console.error('Error in GET /workorders:', err);
     res.status(500).json({ error: err.message });
   }
 });

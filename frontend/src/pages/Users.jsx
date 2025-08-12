@@ -22,9 +22,20 @@ const Users = () => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [creating, setCreating] = useState(false);
+  const [roles, setRoles] = useState([]);
 
   useEffect(() => {
     fetchUsers();
+    // Load dynamic roles list for selector
+    (async () => {
+      try {
+        const res = await authFetch('http://localhost:3000/api/roles');
+        if (res.ok) {
+          const data = await res.json();
+          setRoles(data);
+        }
+      } catch {}
+    })();
   }, []);
 
   const fetchUsers = async () => {
@@ -111,7 +122,8 @@ const Users = () => {
   };
 
   const handleOpenModal = () => {
-    setForm(initialForm);
+    const defaultRole = roles.length > 0 ? roles[0].name : initialForm.role;
+    setForm({ ...initialForm, role: defaultRole });
     setShowModal(true);
   };
 
@@ -202,9 +214,9 @@ const Users = () => {
                 <label className="block mb-1 font-medium">Rola</label>
                 <select name="role" value={form.role} onChange={handleFormChange} className="w-full border rounded px-3 py-2">
                   <option value="admin">admin</option>
-                  <option value="koordynator">koordynator</option>
-                  <option value="kierowca">kierowca</option>
-                  <option value="specjalista_zuc">Specjalista ZUC</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.name}>{r.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="mb-3 flex items-center">

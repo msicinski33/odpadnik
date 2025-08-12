@@ -21,7 +21,22 @@ router.get('/', async (req, res) => {
         hasDisabilityCertificate: true,
         workHours: true,
         overtimeAllowed: true,
-        nightShiftAllowed: true
+        nightShiftAllowed: true,
+        driversLicenseCategories: true,
+        specialQualifications: true,
+        vacationDays: true,
+        damages: {
+          select: {
+            id: true,
+            date: true,
+            description: true,
+            estimatedCost: true,
+            supervisor: true
+          },
+          orderBy: {
+            date: 'desc'
+          }
+        }
       }
     });
     res.json(employees);

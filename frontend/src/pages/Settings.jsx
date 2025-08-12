@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { UserContext } from '../UserContext';
 import authFetch from '../utils/authFetch';
 
@@ -7,6 +7,7 @@ const Settings = () => {
   const [form, setForm] = useState({ email: '', name: '', password: '', role: 'user' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [roles, setRoles] = useState([]);
 
   const handleChange = e => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -29,6 +30,17 @@ const Settings = () => {
       setError(err.message || 'Błąd');
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authFetch('http://localhost:3000/api/roles');
+        if (!res.ok) return;
+        const data = await res.json();
+        setRoles(data);
+      } catch {}
+    })();
+  }, []);
 
   if (!user || user.role !== 'admin') {
     return <div className="max-w-xl mx-auto py-8"><h1 className="text-xl font-bold mb-4">Ustawienia</h1><div className="text-gray-500">Brak dostępu</div></div>;
@@ -54,8 +66,10 @@ const Settings = () => {
         <div>
           <label className="block mb-2">Rola</label>
           <select name="role" value={form.role} onChange={handleChange} className="w-full border px-2 py-1 rounded">
-            <option value="user">Użytkownik</option>
             <option value="admin">Administrator</option>
+            {roles.map(r => (
+              <option key={r.id} value={r.name}>{r.name}</option>
+            ))}
           </select>
         </div>
         {message && <div className="text-green-600">{message}</div>}

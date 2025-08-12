@@ -34,6 +34,8 @@ import OneTimeOrderCard from '../components/OneTimeOrderCard';
 import authFetch from '../utils/authFetch';
 import OneTimeOrderPdf from '../components/OneTimeOrderPdf';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { OneTimeOrdersFilters } from '../components/OneTimeOrdersFilters';
+import { OneTimeOrdersStats } from '../components/OneTimeOrdersStats';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Wszystkie statusy' },
@@ -85,16 +87,10 @@ interface Order {
   vehicle?: { registrationNumber: string; brand?: string };
 }
 
-interface Vehicle {
-  id: number;
-  registrationNumber: string;
-  brand: string;
-}
-
 export default function OneTimeOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('all');
   const [clientCode, setClientCode] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -136,6 +132,28 @@ export default function OneTimeOrders() {
 
   const { toast } = useToast();
 
+
+
+  function calculateStats(orders) {
+    const total = orders.length;
+    const completed = orders.filter(o => o.status === 'COMPLETED').length;
+    const cancelled = orders.filter(o => o.status === 'CANCELLED').length;
+    const awaitingExecution = orders.filter(o => o.status === 'AWAITING_EXECUTION').length;
+    const containerDelivered = orders.filter(o => o.status === 'CONTAINER_DELIVERED').length;
+    const awaitingCompletion = orders.filter(o => o.status === 'AWAITING_COMPLETION').length;
+    const pending = awaitingExecution + containerDelivered + awaitingCompletion;
+
+    return {
+      total,
+      completed,
+      cancelled,
+      pending,
+      awaitingExecution,
+      containerDelivered,
+      awaitingCompletion
+    };
+  }
+
   // Fetch vehicles when assignOrder modal opens
   useEffect(() => {
     if (assignOrder) {
@@ -163,7 +181,7 @@ export default function OneTimeOrders() {
   async function fetchOrders() {
     setLoading(true);
     const params = new URLSearchParams();
-    if (status) params.append('status', status);
+    if (status && status !== 'all') params.append('status', status);
     if (clientCode) params.append('clientCode', clientCode);
     if (from) params.append('from', from);
     if (to) params.append('to', to);
@@ -174,7 +192,13 @@ export default function OneTimeOrders() {
     try {
       const res = await authFetch(`/api/one-time-orders?${params.toString()}`);
       const data = await res.json();
-      setOrders(data);
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else {
+        setOrders([]); // or handle error, e.g. set an error state
+        // Optionally: show a toast or log the error
+        // console.error('Failed to fetch orders:', data.error || data);
+      }
     } catch (error) {
       toast({
         title: "Błąd",
@@ -517,12 +541,130 @@ export default function OneTimeOrders() {
     }
   }
 
+  function handleClearFilters() {
+    setStatus('all');
+    setClientCode('');
+    setFrom('');
+    setTo('');
+    setSearch('');
+  }
+
+  // Generate PDF with all pending orders
+  async function handleGeneratePendingPdf() {
+    try {
+      const res = await fetch('/api/one-time-orders/pending-pdf', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      });
+      
+      if (!res.ok) {
+        if (res.status === 404) {
+          toast({ 
+            title: 'Brak zleceń', 
+            description: 'Nie ma żadnych oczekujących zleceń do wygenerowania', 
+            variant: 'destructive' 
+          });
+        } else {
+          throw new Error('Nie udało się wygenerować PDF');
+        }
+        return;
+      }
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `oczekujace-zlecenia-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      }, 10000);
+      
+      toast({
+        title: "Sukces",
+        description: "PDF z oczekującymi zleceniami został wygenerowany",
+      });
+    } catch (err) {
+      toast({
+        title: "Błąd",
+        description: "Nie udało się wygenerować PDF z oczekującymi zleceniami",
+        variant: "destructive",
+      });
+    }
+  }
+
+  const stats = calculateStats(orders);
+
   return (
-    <div className="p-6">
+    <div className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Zlecenia jednorazowe</h1>
-      <Button className="mb-4" onClick={() => setShowModal(true)}>
-        <Plus className="mr-2 h-4 w-4" /> Dodaj nowe zlecenie
-      </Button>
+
+      {/* Enhanced Filters */}
+      <div className="mb-4">
+        <OneTimeOrdersFilters
+          status={status}
+          onStatusChange={setStatus}
+          clientCode={clientCode}
+          onClientCodeChange={setClientCode}
+          from={from}
+          onFromChange={setFrom}
+          to={to}
+          onToChange={setTo}
+          search={search}
+          onSearchChange={setSearch}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
+
+      {/* Enhanced Stats */}
+      <OneTimeOrdersStats
+        total={stats.total}
+        completed={stats.completed}
+        pending={stats.pending}
+        cancelled={stats.cancelled}
+        awaitingExecution={stats.awaitingExecution}
+        containerDelivered={stats.containerDelivered}
+        awaitingCompletion={stats.awaitingCompletion}
+      />
+
+      {/* Add Order Button */}
+      <div className="mb-4 flex gap-2 items-center">
+        <Button onClick={() => setShowModal(true)} className="bg-blue-600 text-white hover:bg-blue-700">
+          <Plus className="mr-2 h-4 w-4" /> Dodaj nowe zlecenie
+        </Button>
+        <Button
+          onClick={handleGeneratePendingPdf}
+          variant="outline"
+          className="border-blue-600 text-blue-600 hover:bg-blue-50"
+        >
+          <FileText className="mr-2 h-4 w-4" /> PDF Oczekujących
+        </Button>
+        {stats.pending > 0 && (
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 px-3 py-2 rounded-lg border border-yellow-200 flex items-center">
+            <span className="text-sm font-medium text-yellow-800">Oczekujące: </span>
+            <span className="text-sm font-bold text-orange-600"> {stats.pending}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Loading Indicator */}
+      {loading && (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Ładowanie zleceń...</span>
+        </div>
+      )}
+
+      {/* No Data State */}
+      {!loading && orders.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-6xl mb-4">📋</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Brak zleceń</h3>
+          <p className="text-gray-500">Nie znaleziono żadnych zleceń dla wybranych filtrów.</p>
+        </div>
+      )}
       {showModal && (
         <Dialog open={showModal} onOpenChange={setShowModal}>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -875,74 +1017,31 @@ export default function OneTimeOrders() {
           </DialogContent>
         </Dialog>
       )}
-      <div className="flex flex-wrap gap-2 items-end mb-4 bg-muted/50 p-3 rounded-lg border border-muted">
-        <Select value={status} onValueChange={value => setStatus(value)}>
-          <SelectTrigger className="min-w-[140px]">
-            <SelectValue placeholder="Wszystkie statusy" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.filter(opt => opt.value !== '').map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          type="text"
-          placeholder="Kod klienta"
-          value={clientCode}
-          onChange={e => setClientCode(e.target.value)}
-          className="w-[140px]"
-        />
-        <Input
-          type="date"
-          value={from}
-          onChange={e => setFrom(e.target.value)}
-          className="w-[140px]"
-        />
-        <Input
-          type="date"
-          value={to}
-          onChange={e => setTo(e.target.value)}
-          className="w-[140px]"
-        />
-        <Input
-          type="text"
-          placeholder="Szukaj..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 min-w-[180px]"
-        />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {loading ? (
-          <div className="col-span-full text-center p-8">
-            <Skeleton className="h-8 w-1/2 mx-auto" />
-            <Skeleton className="h-8 w-3/4 mt-2 mx-auto" />
-            <Skeleton className="h-8 w-1/4 mt-2 mx-auto" />
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="col-span-full text-center p-8">Nie znaleziono zleceń.</div>
-        ) : orders.map(order => (
-          <OneTimeOrderCard
-            key={order.id}
-            order={order}
-            onAssign={o => setAssignOrder(o)}
-            onPickup={o => setPickupOrder(o)}
-            onComplete={o => setCompleteOrder(o)}
-            onDuplicate={handleDuplicate}
-            onDownloadPdf={handleDownloadPdf}
-            onUploadPdf={handleUploadPdf}
-            onViewPdf={handleViewOrderPdf}
-            onEdit={handleEditOrder}
-            onCancel={handleCancelOrder}
-            onDelete={() => {
-              if (window.confirm('Czy na pewno chcesz usunąć to zlecenie?')) {
-                handleDeleteOrder(order);
-              }
-            }}
-          />
-        ))}
-      </div>
+      {/* Orders Grid */}
+      {!loading && orders.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {orders.map(order => (
+            <OneTimeOrderCard
+              key={order.id}
+              order={order}
+              onAssign={o => setAssignOrder(o)}
+              onPickup={o => setPickupOrder(o)}
+              onComplete={o => setCompleteOrder(o)}
+              onDuplicate={handleDuplicate}
+              onDownloadPdf={handleDownloadPdf}
+              onUploadPdf={handleUploadPdf}
+              onViewPdf={handleViewOrderPdf}
+              onEdit={handleEditOrder}
+              onCancel={handleCancelOrder}
+              onDelete={() => {
+                if (window.confirm('Czy na pewno chcesz usunąć to zlecenie?')) {
+                  handleDeleteOrder(order);
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 } 

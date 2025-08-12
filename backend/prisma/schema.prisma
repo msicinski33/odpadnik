@@ -22,6 +22,30 @@ model User {
   oneTimeOrdersReceived OneTimeOrder[] @relation("ReceivedByUser")
 }
 
+// Dynamic RBAC
+model Role {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  description String?
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id      Int    @id @default(autoincrement())
+  module  String // e.g. 'employees', 'vehicles', '*'
+  action  String // 'read' | 'create' | 'update' | 'delete' | '*'
+  rolePermissions RolePermission[]
+  @@unique([module, action])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  @@id([roleId, permissionId])
+}
+
 model Employee {
   id        Int      @id @default(autoincrement())
   name      String
@@ -36,10 +60,17 @@ model Employee {
   workHours               Int     @default(8) // 7 or 8
   overtimeAllowed         Boolean @default(false)
   nightShiftAllowed       Boolean @default(false)
+  // Driver's license categories (comma-separated string)
+  driversLicenseCategories String? // e.g., "B,C,D,E"
+  // Special qualifications (comma-separated string)
+  specialQualifications    String? // e.g., "ADR,HAZMAT,CRANE"
+  // Vacation allowance in days
+  vacationDays            Int?     @default(26) // Default 26 days per year
   employeeSchedules EmployeeSchedule[]
   drivenAssignments DailyAssignment[] @relation("DriverAssignments")
   assistantAssignments DailyAssignmentAssistant[]
   workCardEntries WorkCardEntry[]
+  damages EmployeeDamage[]
 }
 
 model Vehicle {
@@ -56,6 +87,7 @@ model Vehicle {
   faultReports     VehicleFaultReport[]
   deliveryVehicle   OneTimeOrder[] @relation("DeliveryVehicle")
   pickupVehicle     OneTimeOrder[] @relation("PickupVehicle")
+  debrisBagOrders   DebrisBagOrder[]
 }
 
 model Region {
@@ -292,4 +324,53 @@ model OneTimeOrder {
   notes             String?     // Uwagi
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+} 
+
+model DebrisBagOrder {
+  id                 Int      @id @default(autoincrement())
+  clientRecordNumber String   // Internal ID from contractor/client database
+  clientName         String   // Full name / company name
+  clientPhone        String   // Phone number
+  clientAddress      String   // Residential address
+  renovationAddress  String   // Renovation address (can differ)
+  paymentType        String   // Card, Bank Transfer, or Manual
+  paymentAmount      Float?   // Manual amount entry (if needed)
+  orderNumber        String   // Internal or client-provided order identifier
+  dateReceived       DateTime // When the order was accepted
+  numberOfBags       Int      // How many debris bags are requested
+  bagType            String   // M (small) or D (large)
+  bagNumber          String?  // Unique identifier (if pre-labeled)
+  price              Float?   // Per bag or total cost
+  notes              String?  // Any remarks, delivery instructions, etc.
+
+  // Completion fields
+  serviceExecutionDate DateTime? // When the bags were collected
+  kpoNumber            String?   // Waste transfer card (KPO)
+  vehicleId            Int?      // Vehicle (plate number) that performed the service
+  vehicle              Vehicle?  @relation(fields: [vehicleId], references: [id])
+  bagsCollected        Int?      // Number of bags actually collected
+  invoiceIssueDate     DateTime? // When the invoice was created
+  invoiceNumber        String?   // Reference to financial system
+
+  status               DebrisBagOrderStatus @default(PENDING_COMPLETION)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+enum DebrisBagOrderStatus {
+  PENDING_COMPLETION
+  COMPLETED
+}
+
+model EmployeeDamage {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  date        DateTime
+  description String
+  estimatedCost Float?
+  supervisor   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id])
 } 

@@ -25,7 +25,9 @@
     "puppeteer": "^24.12.1",
     "react-datepicker": "^8.4.0",
     "socket.io": "^4.8.1",
-    "exceljs": "^4.3.0"
+    "exceljs": "^4.3.0",
+    "archiver": "^6.0.2",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "prisma": "^6.11.1"

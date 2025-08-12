@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOMServer from 'react-dom/server';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { Button } from '../components/ui/button';
+import { Button } from "../components/ui/button";
+import { Plus, Download } from "lucide-react";
+import { WorkOrdersNavigation } from "../components/WorkOrdersNavigation";
+import { WorkOrdersFilters } from "../components/WorkOrdersFilters";
+import { WorkOrdersStats } from "../components/WorkOrdersStats";
+import { WorkOrdersGrid } from "../components/WorkOrdersGrid";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import SimpleModal from '../components/SimpleModal';
 import SurowceCreateModal from '../components/SurowceCreateModal';
-import { FileText } from "lucide-react";
-import WorkOrdersGrid from '../components/WorkOrdersGrid';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 import WorkOrdersPDF from './WorkOrdersPDF';
 import WorkOrderModal from '../components/WorkOrderModal';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import authFetch from '../utils/authFetch';
 
 const TABS = [
   { key: 'surowce', label: 'Surowce wtórne' },
@@ -27,8 +33,6 @@ const modalTitles = {
   bezpylne: 'Dodaj zlecenie – Bezpylne',
 };
 
-
-
 const USLUGI_RODZAJ_OPTIONS = ['Opróżnienie', 'Wstawienie', 'Zabranie'];
 const USLUGI_KONTENER_OPTIONS = ['KP-12', 'KP-18', 'KP-21', 'KP-26', 'KP-29', 'KP-30', 'KP-35', 'KP-36', 'PRASOKONTENER'];
 
@@ -40,6 +44,14 @@ const BEZPYLNE_RODZAJ_OPTIONS = ['reklamacja', 'zlecenie dodatkowe', 'informacja
 const WORKI_RODZAJ_OPTIONS = ['M', 'M (99 zł)', 'D'];
 
 const WorkOrders = () => {
+  // Enhanced WorkOrders component with:
+  // - WorkOrdersNavigation: Tab navigation with order counts
+  // - WorkOrdersFilters: Advanced filtering with date picker, search, and PDF download
+  // - WorkOrdersStats: Statistics cards showing total, completed, pending, and failed orders
+  // - Loading states and error handling
+  // - No data state when no orders are found
+  // - Improved UI with animations and better user experience
+
   const [activeTab, setActiveTab] = useState(TABS[0].key);
   const [workOrders, setWorkOrders] = useState([]);
   const [filterDate, setFilterDate] = useState(null);
@@ -127,6 +139,7 @@ const WorkOrders = () => {
   const [workiCause, setWorkiCause] = useState('');
   const [deleteModal, setDeleteModal] = useState({ open: false, order: null, loading: false });
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Per-tab search fields
   const tabSearchFields = {
@@ -150,14 +163,24 @@ const WorkOrders = () => {
 
   // Per-tab filtered work orders
   function filterOrders(orders, tab) {
-    if (!searchTerm.trim()) return orders;
-    const fields = tabSearchFields[tab] || [];
-    return orders.filter(order =>
-      fields.some(field => {
-        const val = order[field] || '';
-        return val.toString().toLowerCase().includes(searchTerm.toLowerCase());
-      })
-    );
+    // Ensure orders is an array
+    if (!Array.isArray(orders)) return [];
+    
+    // First filter by tab type
+    let filteredOrders = orders.filter(order => order.type === tab);
+    
+    // Then filter by search term if provided
+    if (searchTerm.trim()) {
+      const fields = tabSearchFields[tab] || [];
+      filteredOrders = filteredOrders.filter(order =>
+        fields.some(field => {
+          const val = order[field] || '';
+          return val.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        })
+      );
+    }
+    
+    return filteredOrders;
   }
 
   // Helper to count pending orders for a specific day
@@ -167,62 +190,26 @@ const WorkOrders = () => {
     return orders.filter(o => !o.completed && o[dateField] && o[dateField].slice(0, 10) === dateStr).length;
   }
 
-  // Fetch work orders
+  // Fetch all work orders
   useEffect(() => {
-    let url = '/workorders';
+    setIsLoading(true);
+    let url = '/api/workorders';
     if (filterDate) {
       const dateStr = filterDate.toISOString().slice(0, 10);
       url += `?executionDate=${dateStr}`;
     }
-    fetch(url)
+    authFetch(url)
       .then(res => res.json())
-      .then(data => setWorkOrders(data));
+      .then(data => {
+        setWorkOrders(Array.isArray(data) ? data : []);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error fetching work orders:', error);
+        setWorkOrders([]);
+        setIsLoading(false);
+      });
   }, [filterDate]);
-
-  // Fetch Surowce work orders
-  useEffect(() => {
-    if (activeTab === 'surowce') {
-      fetch('/workorders?type=surowce')
-        .then(res => res.json())
-        .then(data => setWorkOrders(Array.isArray(data) ? data : []));
-    }
-  }, [activeTab]);
-
-  // Fetch Worki gruzowe work orders
-  useEffect(() => {
-    if (activeTab === 'worki') {
-      fetch('/workorders?type=worki')
-        .then(res => res.json())
-        .then(data => setWorkOrders(Array.isArray(data) ? data : []));
-    }
-  }, [activeTab]);
-
-  // Fetch Uslugi work orders
-  useEffect(() => {
-    if (activeTab === 'uslugi') {
-      fetch('/workorders?type=uslugi')
-        .then(res => res.json())
-        .then(data => setWorkOrders(Array.isArray(data) ? data : []));
-    }
-  }, [activeTab]);
-
-  // Fetch Bramy work orders
-  useEffect(() => {
-    if (activeTab === 'bramy') {
-      fetch('/workorders?type=bramy')
-        .then(res => res.json())
-        .then(data => setWorkOrders(Array.isArray(data) ? data : []));
-    }
-  }, [activeTab]);
-
-  // Fetch Bezpylne work orders
-  useEffect(() => {
-    if (activeTab === 'bezpylne') {
-      fetch('/workorders?type=bezpylne')
-        .then(res => res.json())
-        .then(data => setWorkOrders(Array.isArray(data) ? data : []));
-    }
-  }, [activeTab]);
 
   // Create new work order
   const handleCreate = form => {
@@ -232,7 +219,7 @@ const WorkOrders = () => {
       type: 'surowce',
       dateReceived: form.dateReceived ? form.dateReceived.toISOString() : null,
       realizationDate: form.realizationDate ? form.realizationDate.toISOString() : null,
-      executionDate: form.realizationDate ? form.realizationDate.toISOString() : null,
+      executionDate: form.realizationDate ? form.realizationDate.toISOString() : (form.dateReceived ? form.dateReceived.toISOString() : new Date().toISOString()),
       receivedBy: form.receivedBy,
       address: form.address,
       company: form.klient,
@@ -240,9 +227,8 @@ const WorkOrders = () => {
       rodzaj: form.rodzaj,
       notes: form.uwagi && form.uwagi.trim() !== '' ? form.uwagi : null,
     };
-    fetch('/workorders', {
+    authFetch('/api/workorders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
       .then(res => {
@@ -271,9 +257,8 @@ const WorkOrders = () => {
 
   // Save assignment
   const handleSaveAssignment = ({ responsible, vehicle }) => {
-    fetch(`/workorders/${selectedOrder.id}`, {
+    authFetch(`/api/workorders/${selectedOrder.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ responsible, vehicle }),
     })
       .then(res => res.json())
@@ -285,9 +270,8 @@ const WorkOrders = () => {
 
   // Toggle completion
   const handleToggleComplete = (order, completed) => {
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed }),
     })
       .then(res => res.json())
@@ -296,9 +280,8 @@ const WorkOrders = () => {
 
   // Save cause for Niezrealizowane
   const handleSaveCause = () => {
-    fetch(`/workorders/${causeModal.order.id}`, {
+    authFetch(`/api/workorders/${causeModal.order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cause }),
     })
       .then(res => res.json())
@@ -308,8 +291,6 @@ const WorkOrders = () => {
         setCause('');
       });
   };
-
-
 
   // Create new worki gruzowe order
   const handleCreateWorki = form => {
@@ -328,9 +309,8 @@ const WorkOrders = () => {
       bagNumber: form.bagNumber,
       notes: form.notes && form.notes.trim() !== '' ? form.notes : null,
     };
-    fetch('/workorders', {
+    authFetch('/api/workorders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
       .then(res => {
@@ -351,14 +331,11 @@ const WorkOrders = () => {
       });
   };
 
-
-
   // Save assignment for worki gruzowe
   const handleAssignWorki = ({ responsible, vehicle }) => {
     const order = workiAssignModal.order;
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ responsible, vehicle }),
     })
       .then(res => res.json())
@@ -385,9 +362,8 @@ const WorkOrders = () => {
       realizationDate: form.realizationDate,
       notes: form.notes && form.notes.trim() !== '' ? form.notes : null,
     };
-    fetch('/workorders', {
+    authFetch('/api/workorders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
       .then(res => {
@@ -410,9 +386,8 @@ const WorkOrders = () => {
 
   const handleAssignUslugi = ({ responsible, vehicle }) => {
     const order = uslugiAssignModal.order;
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ responsible, vehicle }),
     })
       .then(res => res.json())
@@ -423,9 +398,8 @@ const WorkOrders = () => {
   };
 
   const handleToggleCompleteUslugi = (order, completed) => {
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed }),
     })
       .then(res => res.json())
@@ -433,13 +407,12 @@ const WorkOrders = () => {
   };
 
   const handleSaveUslugiCause = () => {
-    fetch(`/workorders/${uslugiCauseModal.order.id}`, {
+    authFetch(`/api/workorders/${uslugiCauseModal.order.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cause: uslugiCause }),
     })
       .then(res => res.json())
-      .then(updated => {
+    .then(updated => {
         setWorkOrders(orders => (Array.isArray(orders) ? orders : []).map(o => o.id === updated.id ? updated : o));
         setUslugiCauseModal({ open: false, order: null });
         setUslugiCause('');
@@ -463,7 +436,7 @@ const WorkOrders = () => {
       realizationDate: form.realizationDate,
       notes: form.notes && form.notes.trim() !== '' ? form.notes : null,
     };
-    fetch('/workorders', {
+    authFetch('/api/workorders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -488,7 +461,7 @@ const WorkOrders = () => {
 
   const handleAssignBramy = ({ responsible, vehicle }) => {
     const order = bramyAssignModal.order;
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ responsible, vehicle }),
@@ -501,7 +474,7 @@ const WorkOrders = () => {
   };
 
   const handleToggleCompleteBramy = (order, completed) => {
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed }),
@@ -511,7 +484,7 @@ const WorkOrders = () => {
   };
 
   const handleSaveBramyCause = () => {
-    fetch(`/workorders/${bramyCauseModal.order.id}`, {
+    authFetch(`/api/workorders/${bramyCauseModal.order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cause: bramyCause }),
@@ -541,7 +514,7 @@ const WorkOrders = () => {
       notes: form.notes && form.notes.trim() !== '' ? form.notes : null,
     };
     if (form.id) {
-      fetch(`/workorders/${form.id}`, {
+      authFetch(`/api/workorders/${form.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -563,7 +536,7 @@ const WorkOrders = () => {
           console.log('Frontend error:', err);
         });
     } else {
-      fetch('/workorders', {
+      authFetch('/api/workorders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -589,7 +562,7 @@ const WorkOrders = () => {
 
   const handleAssignBezpylne = ({ responsible, vehicle }) => {
     const order = bezpylneAssignModal.order;
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ responsible, vehicle }),
@@ -602,7 +575,7 @@ const WorkOrders = () => {
   };
 
   const handleToggleCompleteBezpylne = (order, completed) => {
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed }),
@@ -612,7 +585,7 @@ const WorkOrders = () => {
   };
 
   const handleSaveBezpylneCause = () => {
-    fetch(`/workorders/${bezpylneCauseModal.order.id}`, {
+    authFetch(`/api/workorders/${bezpylneCauseModal.order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cause: bezpylneCause }),
@@ -629,7 +602,7 @@ const WorkOrders = () => {
   const handleToggleCompleteWorki = (order, completed, realizationDate) => {
     const body = { completed };
     if (realizationDate) body.realizationDate = realizationDate;
-    fetch(`/workorders/${order.id}`, {
+    authFetch(`/api/workorders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -640,7 +613,7 @@ const WorkOrders = () => {
 
   // Save cause for Niezrealizowane for worki gruzowe
   const handleSaveWorkiCause = () => {
-    fetch(`/workorders/${workiCauseModal.order.id}`, {
+    authFetch(`/api/workorders/${workiCauseModal.order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cause: workiCause }),
@@ -659,7 +632,7 @@ const WorkOrders = () => {
 
   const confirmDeleteOrder = () => {
     setDeleteModal(dm => ({ ...dm, loading: true }));
-    fetch(`/workorders/${deleteModal.order.id}`, { method: 'DELETE' })
+    authFetch(`/api/workorders/${deleteModal.order.id}`, { method: 'DELETE' })
       .then(res => {
         setDeleteModal({ open: false, order: null, loading: false });
         if (res.ok) {
@@ -668,40 +641,260 @@ const WorkOrders = () => {
       });
   };
 
+  // Calculate statistics
+  const stats = {
+    total: filterOrders(Array.isArray(workOrders) ? workOrders : [], activeTab).length,
+    completed: filterOrders(Array.isArray(workOrders) ? workOrders : [], activeTab).filter(o => o.completed).length,
+    pending: filterOrders(Array.isArray(workOrders) ? workOrders : [], activeTab).filter(o => !o.completed && !o.cause).length,
+    failed: filterOrders(Array.isArray(workOrders) ? workOrders : [], activeTab).filter(o => o.cause).length,
+  };
+
+  const pendingCount = filterDate 
+    ? countPendingForDay(filterOrders(Array.isArray(workOrders) ? workOrders : [], activeTab), 'executionDate') 
+    : 0;
+
+  const handleAddOrder = () => {
+    setModalOpen(true);
+  };
+
+  const handleEdit = (order) => {
+    setSelectedOrder(order);
+    if (order.type === 'worki') {
+      setWorkiForm({
+        company: order.company || '',
+        address: order.address || '',
+        receivedBy: order.receivedBy || '',
+        quantity: order.quantity || '',
+        rodzaj: order.rodzaj || '',
+        orderNumber: order.orderNumber || '',
+        bagNumber: order.bagNumber || '',
+        notes: order.notes || ''
+      });
+      setWorkiModalOpen(true);
+    } else if (order.type === 'uslugi') {
+      setUslugiForm({
+        company: order.company || '',
+        address: order.address || '',
+        receivedBy: order.receivedBy || '',
+        wasteType: order.wasteType || '',
+        rodzaj: order.rodzaj || '',
+        kontener: order.kontener || '',
+        notes: order.notes || ''
+      });
+      setUslugiModalOpen(true);
+    } else if (order.type === 'bramy') {
+      setBramyForm({
+        company: order.company || '',
+        address: order.address || '',
+        receivedBy: order.receivedBy || '',
+        wasteType: order.wasteType || '',
+        rodzaj: order.rodzaj || '',
+        kontener: order.kontener || '',
+        notes: order.notes || ''
+      });
+      setBramyModalOpen(true);
+    } else if (order.type === 'bezpylne') {
+      setBezpylneForm({
+        company: order.company || '',
+        address: order.address || '',
+        receivedBy: order.receivedBy || '',
+        rodzaj: order.rodzaj || '',
+        zlecenie: order.zlecenie || '',
+        notes: order.notes || ''
+      });
+      setBezpylneModalOpen(true);
+    }
+  };
+
+  const handleDelete = (order) => {
+    setDeleteModal({ open: true, order, loading: false });
+  };
+
+  const confirmDelete = async () => {
+    if (deleteModal.order) {
+      try {
+        setDeleteModal(prev => ({ ...prev, loading: true }));
+        const response = await authFetch(`/api/workorders/${deleteModal.order.id}`, { method: 'DELETE' });
+        if (response.ok) {
+          setWorkOrders(orders => (Array.isArray(orders) ? orders : []).filter(o => o.id !== deleteModal.order.id));
+        }
+        setDeleteModal(prev => ({ ...prev, open: false, order: null, loading: false }));
+      } catch (error) {
+        console.error('Error deleting order:', error);
+        setDeleteModal(prev => ({ ...prev, loading: false }));
+      }
+    }
+  };
+
+  const handleClearFilters = () => {
+    setFilterDate(null);
+    setSearchTerm('');
+  };
+
+  const handleDownloadPDF = () => {
+    let ordersToDownload = [];
+    let title = '';
+    let date = null;
+
+    if (activeTab === 'worki') {
+      // For worki gruzowe: download ALL pending orders
+      ordersToDownload = workOrders.filter(order => 
+        order.type === 'worki' && !order.completed && !order.cause
+      );
+      title = `Zlecenia ${TABS.find(t => t.key === activeTab)?.label} - Wszystkie oczekujące`;
+      date = null;
+    } else {
+      // For other tabs: download orders for selected date
+      if (!filterDate) return;
+      
+      const dateStr = filterDate.toISOString().slice(0, 10);
+      ordersToDownload = workOrders.filter(order => {
+        const orderDate = new Date(order.realizationDate || order.dateReceived);
+        const orderDateStr = orderDate.toISOString().slice(0, 10);
+        return orderDateStr === dateStr && order.type === activeTab;
+      });
+      title = `Zlecenia ${TABS.find(t => t.key === activeTab)?.label} - ${filterDate.toLocaleDateString('pl-PL')}`;
+      date = filterDate;
+    }
+
+    if (ordersToDownload.length === 0) {
+      const message = activeTab === 'worki' 
+        ? 'Brak oczekujących zleceń worki gruzowe.'
+        : 'Brak zleceń na wybrany dzień.';
+      alert(message);
+      return;
+    }
+
+    const pdfContent = document.createElement('div');
+    pdfContent.innerHTML = ReactDOMServer.renderToString(
+      <WorkOrdersPDF 
+        orders={ordersToDownload}
+        date={date}
+        title={title}
+      />
+    );
+    
+    const printWindow = window.open('', '_blank');
+    printWindow?.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 15mm;
+            }
+            
+            body { 
+              font-family: 'Noto Sans', Arial, sans-serif; 
+              margin: 0; 
+              padding: 0; 
+              background: white;
+              width: 210mm;
+              min-height: 297mm;
+              box-sizing: border-box;
+            }
+            
+            @media print {
+              body { 
+                margin: 0; 
+                padding: 0;
+                width: 210mm;
+                height: 297mm;
+              }
+              .no-print { display: none; }
+              * {
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+              }
+            }
+            
+            @media screen {
+              body {
+                padding: 20px;
+                max-width: 210mm;
+                margin: 0 auto;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${pdfContent.innerHTML}
+          <div class="no-print" style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print()" style="padding: 10px 20px; background: #0ea5e9; color: white; border: none; border-radius: 5px; cursor: pointer;">
+              Drukuj PDF
+            </button>
+            <button onclick="window.close()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+              Zamknij
+            </button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow?.document.close();
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Zlecenia pracy</h1>
-      <div className="flex gap-2 mb-4 border-b">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors duration-150 ${activeTab === tab.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-blue-600'}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <div className="mb-4 flex items-center gap-4">
-        <span>Filtruj według daty wykonania:</span>
-        <DatePicker selected={filterDate} onChange={setFilterDate} dateFormat="dd-MM-yyyy" className="border rounded px-2 py-1" isClearable />
-        <Button onClick={() => setFilterDate(null)}>Wyczyść</Button>
-        <input
-          type="text"
-          placeholder="Szukaj..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className="border rounded px-2 py-1 ml-4"
-          style={{ minWidth: 200 }}
+      
+      {/* Enhanced Navigation with counts */}
+      <WorkOrdersNavigation
+        tabs={TABS.map(tab => ({
+          ...tab,
+          count: filterOrders(Array.isArray(workOrders) ? workOrders : [], tab.key).length
+        }))}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      {/* Enhanced Filters */}
+      <div className="mb-6">
+        <WorkOrdersFilters
+          filterDate={filterDate}
+          onFilterDateChange={setFilterDate}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          onClearFilters={handleClearFilters}
+          pendingCount={pendingCount}
+          onDownloadPDF={handleDownloadPDF}
+          showPDFButton={filterDate || activeTab === 'worki'}
         />
       </div>
+
+      {/* Enhanced Stats */}
+      <WorkOrdersStats
+        total={stats.total}
+        completed={stats.completed}
+        pending={stats.pending}
+        failed={stats.failed}
+      />
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Ładowanie zleceń...</span>
+        </div>
+      )}
+
+      {/* No Data State */}
+      {!isLoading && Array.isArray(workOrders) && workOrders.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-6xl mb-4">📋</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Brak zleceń</h3>
+          <p className="text-gray-500">Nie znaleziono żadnych zleceń dla wybranych filtrów.</p>
+        </div>
+      )}
+
       {activeTab === 'surowce' && (
         <>
           <div className="mb-4 flex items-center gap-4">
             <Button onClick={() => { setSelectedOrder(null); setModalOpen(true); }} className="bg-blue-600 text-white">+ Dodaj zlecenie</Button>
           </div>
           <WorkOrdersGrid
-            workOrders={sortPendingFirst(filterOrders((Array.isArray(workOrders) ? workOrders : []).filter(o => o.type === 'surowce'), 'surowce'))}
+            workOrders={sortPendingFirst(filterOrders(Array.isArray(workOrders) ? workOrders : [], 'surowce'))}
             onToggleComplete={handleToggleComplete}
             onAssign={handleAssign}
             onMarkFailed={order => setCauseModal({ open: true, order })}
@@ -724,14 +917,14 @@ const WorkOrders = () => {
             onCreate={form => {
               if (selectedOrder && selectedOrder.id) {
                 // Edit mode
-                fetch(`/workorders/${selectedOrder.id}`, {
+                authFetch(`/api/workorders/${selectedOrder.id}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     type: 'surowce',
                     dateReceived: form.dateReceived ? form.dateReceived.toISOString() : null,
                     realizationDate: form.realizationDate ? form.realizationDate.toISOString() : null,
-                    executionDate: form.realizationDate ? form.realizationDate.toISOString() : null,
+                    executionDate: form.realizationDate ? form.realizationDate.toISOString() : (form.dateReceived ? form.dateReceived.toISOString() : new Date().toISOString()),
                     receivedBy: form.receivedBy,
                     odpad: form.odpad,
                     rodzaj: form.rodzaj,
@@ -757,7 +950,7 @@ const WorkOrders = () => {
                 className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 mt-2"
                 onClick={() => {
                   if (window.confirm('Czy na pewno chcesz usunąć to zlecenie?')) {
-                    fetch(`/workorders/${selectedOrder.id}`, { method: 'DELETE' })
+                    authFetch(`/api/workorders/${selectedOrder.id}`, { method: 'DELETE' })
                       .then(res => {
                         if (res.ok) {
                           setWorkOrders(orders => (Array.isArray(orders) ? orders : []).filter(o => o.id !== selectedOrder.id));
@@ -802,7 +995,7 @@ const WorkOrders = () => {
             }); setWorkiModalOpen(true); }} className="bg-blue-600 text-white">+ Dodaj zlecenie</Button>
           </div>
           <WorkOrdersGrid
-            workOrders={sortPendingFirst(filterOrders((Array.isArray(workOrders) ? workOrders : []).filter(o => o.type === 'worki'), 'worki'))}
+            workOrders={sortPendingFirst(filterOrders(Array.isArray(workOrders) ? workOrders : [], 'worki'))}
             onToggleComplete={handleToggleCompleteWorki}
             onAssign={order => setWorkiAssignModal({ open: true, order })}
             onMarkFailed={order => setWorkiCauseModal({ open: true, order })}
@@ -822,7 +1015,6 @@ const WorkOrders = () => {
             open={workiModalOpen} 
             onClose={() => setWorkiModalOpen(false)}
             title={workiForm && workiForm.id ? "Edytuj zlecenie – Worki gruzowe" : "Dodaj zlecenie – Worki gruzowe"}
-            icon={<FileText className="h-6 w-6" />}
           >
             <form onSubmit={e => {
               e.preventDefault();
@@ -833,7 +1025,7 @@ const WorkOrders = () => {
               setWorkiFormError('');
               if (workiForm.id) {
                 // Edit mode
-                fetch(`/workorders/${workiForm.id}`, {
+                authFetch(`/api/workorders/${workiForm.id}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -923,27 +1115,6 @@ const WorkOrders = () => {
       )}
       {activeTab === 'uslugi' && (
         <>
-          <div className="mb-2 font-semibold text-blue-700 flex items-center gap-4">
-            Liczba niezrealizowanych zleceń na wybrany dzień: {countPendingForDay(workOrders.filter(o => o.type === 'uslugi'), 'realizationDate')}
-            {filterDate && (
-              <PDFDownloadLink
-                document={<WorkOrdersPDF orders={workOrders.filter(o => o.type === 'uslugi' && !o.completed && o.realizationDate && o.realizationDate.slice(0, 10) === filterDate.toISOString().slice(0, 10))} title="Zlecenia Usługi" />}
-                fileName={`uslugi_pending_orders_${filterDate.toISOString().slice(0, 10)}.pdf`}
-                style={{
-                  display: 'inline-block',
-                  padding: '8px 16px',
-                  backgroundColor: '#2563eb',
-                  color: '#fff',
-                  borderRadius: 6,
-                  textDecoration: 'none',
-                  fontWeight: 500,
-                  margin: '8px 0',
-                }}
-              >
-                Pobierz PDF
-              </PDFDownloadLink>
-            )}
-          </div>
           <div className="mb-4 flex items-center gap-4">
             <Button onClick={() => { setUslugiForm({
               dateReceived: new Date(),
@@ -958,7 +1129,7 @@ const WorkOrders = () => {
             }); setUslugiModalOpen(true); }} className="bg-blue-600 text-white">+ Dodaj zlecenie</Button>
           </div>
           <WorkOrdersGrid
-            workOrders={sortPendingFirst(filterOrders((Array.isArray(workOrders) ? workOrders : []).filter(o => o.type === 'uslugi'), 'uslugi'))}
+            workOrders={sortPendingFirst(filterOrders(Array.isArray(workOrders) ? workOrders : [], 'uslugi'))}
             onToggleComplete={handleToggleCompleteUslugi}
             onAssign={order => setUslugiAssignModal({ open: true, order })}
             onMarkFailed={order => setUslugiCauseModal({ open: true, order })}
@@ -978,7 +1149,6 @@ const WorkOrders = () => {
             open={uslugiModalOpen} 
             onClose={() => setUslugiModalOpen(false)}
             title={uslugiForm && uslugiForm.id ? "Edytuj zlecenie – Usługi" : "Dodaj zlecenie – Usługi"}
-            icon={<FileText className="h-6 w-6" />}
           >
             <form onSubmit={e => {
               e.preventDefault();
@@ -989,7 +1159,7 @@ const WorkOrders = () => {
               setUslugiFormError('');
               if (uslugiForm.id) {
                 // Edit mode
-                fetch(`/workorders/${uslugiForm.id}`, {
+                authFetch(`/api/workorders/${uslugiForm.id}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1082,27 +1252,6 @@ const WorkOrders = () => {
       )}
       {activeTab === 'bramy' && (
         <>
-          <div className="mb-2 font-semibold text-blue-700 flex items-center gap-4">
-            Liczba niezrealizowanych zleceń na wybrany dzień: {countPendingForDay(workOrders.filter(o => o.type === 'bramy'), 'realizationDate')}
-            {filterDate && (
-              <PDFDownloadLink
-                document={<WorkOrdersPDF orders={workOrders.filter(o => o.type === 'bramy' && !o.completed && o.realizationDate && o.realizationDate.slice(0, 10) === filterDate.toISOString().slice(0, 10))} title="Zlecenia Bramy" />}
-                fileName={`bramy_pending_orders_${filterDate.toISOString().slice(0, 10)}.pdf`}
-                style={{
-                  display: 'inline-block',
-                  padding: '8px 16px',
-                  backgroundColor: '#2563eb',
-                  color: '#fff',
-                  borderRadius: 6,
-                  textDecoration: 'none',
-                  fontWeight: 500,
-                  margin: '8px 0',
-                }}
-              >
-                Pobierz PDF
-              </PDFDownloadLink>
-            )}
-          </div>
           <div className="mb-4 flex items-center gap-4">
             <Button onClick={() => { setBramyForm({
               dateReceived: new Date(),
@@ -1117,7 +1266,7 @@ const WorkOrders = () => {
             }); setBramyModalOpen(true); }} className="bg-blue-600 text-white">+ Dodaj zlecenie</Button>
           </div>
           <WorkOrdersGrid
-            workOrders={sortPendingFirst(filterOrders((Array.isArray(workOrders) ? workOrders : []).filter(o => o.type === 'bramy'), 'bramy'))}
+            workOrders={sortPendingFirst(filterOrders(Array.isArray(workOrders) ? workOrders : [], 'bramy'))}
             onToggleComplete={handleToggleCompleteBramy}
             onAssign={order => setBramyAssignModal({ open: true, order })}
             onMarkFailed={order => setBramyCauseModal({ open: true, order })}
@@ -1137,7 +1286,6 @@ const WorkOrders = () => {
             open={bramyModalOpen} 
             onClose={() => setBramyModalOpen(false)}
             title={bramyForm && bramyForm.id ? "Edytuj zlecenie – Bramy" : "Dodaj zlecenie – Bramy"}
-            icon={<FileText className="h-6 w-6" />}
           >
             <form onSubmit={e => {
               e.preventDefault();
@@ -1148,7 +1296,7 @@ const WorkOrders = () => {
               setBramyFormError('');
               if (bramyForm.id) {
                 // Edit mode
-                fetch(`/workorders/${bramyForm.id}`, {
+                authFetch(`/api/workorders/${bramyForm.id}`, {
                   method: 'PUT',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -1254,7 +1402,7 @@ const WorkOrders = () => {
             }); setBezpylneModalOpen(true); }} className="bg-blue-600 text-white">+ Dodaj zlecenie</Button>
           </div>
           <WorkOrdersGrid
-            workOrders={sortPendingFirst(filterOrders(workOrders, 'bezpylne'))}
+            workOrders={sortPendingFirst(filterOrders(Array.isArray(workOrders) ? workOrders : [], 'bezpylne'))}
             onToggleComplete={handleToggleCompleteBezpylne}
             onAssign={order => setBezpylneAssignModal({ open: true, order })}
             onMarkFailed={order => setBezpylneCauseModal({ open: true, order })}
@@ -1274,7 +1422,6 @@ const WorkOrders = () => {
             open={bezpylneModalOpen} 
             onClose={() => setBezpylneModalOpen(false)}
             title={bezpylneForm && bezpylneForm.id ? "Edytuj zlecenie – Bezpylne" : "Dodaj zlecenie – Bezpylne"}
-            icon={<FileText className="h-6 w-6" />}
           >
             <form onSubmit={e => {
               e.preventDefault();

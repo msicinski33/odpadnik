@@ -52,6 +52,10 @@ router.get('/:id', async (req, res) => {
 // Create vehicle
 router.post('/', async (req, res) => {
   try {
+    // Check for registrationNumber presence
+    if (!req.body.registrationNumber) {
+      return res.status(400).json({ error: 'Registration number is required.' });
+    }
     // Check for unique registrationNumber
     const existing = await prisma.vehicle.findUnique({
       where: { registrationNumber: req.body.registrationNumber }
@@ -127,16 +131,63 @@ router.post('/:id/fault', async (req, res) => {
     const emailContent = {
       from: process.env.EMAIL_USER || 'your-email@gmail.com',
       to: process.env.FLEET_EMAIL || 'fleet@yourcompany.com',
-      subject: `[Vehicle Fault Report] ${vehicle.brand} ${vehicle.registrationNumber}`,
+      subject: `🚨 AWARIA POJAZDU - ${vehicle.brand} ${vehicle.registrationNumber}`,
       html: `
-        <h2>Vehicle Fault Report</h2>
-        <p><strong>Vehicle:</strong> ${vehicle.brand}</p>
-        <p><strong>Plate:</strong> ${vehicle.registrationNumber}</p>
-        <p><strong>Status:</strong> Marked as FAULTY</p>
-        <br>
-        <p><strong>Reported by:</strong> ${reportedBy}</p>
-        <p><strong>Date:</strong> ${new Date().toLocaleString('pl-PL')}</p>
-        ${description ? `<br><p><strong>Description:</strong></p><p>${description}</p>` : ''}
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #dc2626; border-radius: 8px; background-color: #fef2f2;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #dc2626; margin: 0;">🚨 ZGŁOSZENIE AWARII POJAZDU</h1>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0;">Szczegóły pojazdu:</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Marka:</td>
+                <td style="padding: 8px;">${vehicle.brand}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Numer rejestracyjny:</td>
+                <td style="padding: 8px; font-weight: bold; color: #dc2626;">${vehicle.registrationNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Status:</td>
+                <td style="padding: 8px; color: #dc2626; font-weight: bold;">❌ OZNACZONY JAKO NIESPRAWNY</td>
+              </tr>
+            </table>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0;">Informacje o zgłoszeniu:</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Zgłoszony przez:</td>
+                <td style="padding: 8px;">${reportedBy}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Data zgłoszenia:</td>
+                <td style="padding: 8px;">${new Date().toLocaleString('pl-PL')}</td>
+              </tr>
+            </table>
+            ${description ? `
+            <div style="margin-top: 15px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Opis problemu:</h3>
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 4px; border-left: 4px solid #dc2626;">
+                ${description}
+              </div>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; padding: 15px; background-color: #fef3c7; border-radius: 6px;">
+            <p style="margin: 0; color: #92400e; font-weight: bold;">
+              ⚠️ Wymagana natychmiastowa interwencja!
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280;">
+            <p>Wiadomość wygenerowana automatycznie przez system ODPADnik</p>
+          </div>
+        </div>
       `
     };
 
@@ -158,6 +209,24 @@ router.put('/:id/fault/resolve', async (req, res) => {
   try {
     const vehicleId = Number(req.params.id);
 
+    // Get vehicle details before updating
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId }
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+
+    // Get the latest fault report for context
+    const latestFault = await prisma.vehicleFaultReport.findFirst({
+      where: { 
+        vehicleId,
+        isResolved: false
+      },
+      orderBy: { reportedAt: 'desc' }
+    });
+
     // Update vehicle status back to operational
     await prisma.vehicle.update({
       where: { id: vehicleId },
@@ -175,6 +244,82 @@ router.put('/:id/fault/resolve', async (req, res) => {
         resolvedAt: new Date()
       }
     });
+
+    // Send email notification about vehicle repair
+    const emailContent = {
+      from: process.env.EMAIL_USER || 'your-email@gmail.com',
+      to: process.env.FLEET_EMAIL || 'fleet@yourcompany.com',
+      subject: `✅ POJAZD NAPRAWIONY - ${vehicle.brand} ${vehicle.registrationNumber}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px solid #059669; border-radius: 8px; background-color: #f0fdf4;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #059669; margin: 0;">✅ POJAZD NAPRAWIONY I GOTOWY DO PRACY</h1>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0;">Szczegóły pojazdu:</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Marka:</td>
+                <td style="padding: 8px;">${vehicle.brand}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Numer rejestracyjny:</td>
+                <td style="padding: 8px; font-weight: bold; color: #059669;">${vehicle.registrationNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Status:</td>
+                <td style="padding: 8px; color: #059669; font-weight: bold;">✅ OZNACZONY JAKO SPRAWNY</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Typ:</td>
+                <td style="padding: 8px;">${vehicle.vehicleType || '-'}</td>
+              </tr>
+            </table>
+          </div>
+          
+          <div style="background-color: white; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+            <h2 style="color: #1f2937; margin-top: 0;">Informacje o naprawie:</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Data naprawy:</td>
+                <td style="padding: 8px;">${new Date().toLocaleString('pl-PL')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px; font-weight: bold; color: #374151;">Status:</td>
+                <td style="padding: 8px; color: #059669; font-weight: bold;">✅ GOTOWY DO PRACY</td>
+              </tr>
+            </table>
+            ${latestFault ? `
+            <div style="margin-top: 15px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Naprawiony problem:</h3>
+              <div style="background-color: #f0fdf4; padding: 15px; border-radius: 4px; border-left: 4px solid #059669;">
+                <strong>Oryginalny opis usterki:</strong><br>
+                ${latestFault.description || 'Brak opisu'}
+              </div>
+            </div>
+            ` : ''}
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; padding: 15px; background-color: #d1fae5; border-radius: 6px;">
+            <p style="margin: 0; color: #065f46; font-weight: bold;">
+              🚀 Pojazd jest gotowy do ponownego użycia w operacjach!
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280;">
+            <p>Wiadomość wygenerowana automatycznie przez system ODPADnik</p>
+          </div>
+        </div>
+      `
+    };
+
+    try {
+      await transporter.sendMail(emailContent);
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.json({ message: 'Vehicle fault resolved' });
   } catch (error) {

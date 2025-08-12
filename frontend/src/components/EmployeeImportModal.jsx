@@ -10,6 +10,8 @@ const REQUIRED_COLUMNS = [
   'Stanowisko',
   'Data zatrudnienia',
   'Orzeczenie o niepełnosprawności',
+  'Kategorie prawa jazdy',
+  'Specjalne kwalifikacje',
 ];
 
 const TEMPLATE_FILENAME = 'employee_import_template.xlsx';

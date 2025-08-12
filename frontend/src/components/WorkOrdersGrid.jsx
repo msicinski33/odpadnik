@@ -1,92 +1,57 @@
 import React from 'react';
-import WorkOrderCard from './WorkOrderCard';
+import { WorkOrderCard } from "./WorkOrderCard";
+import { Card, CardContent } from "./ui/card";
+import { FileX } from "lucide-react";
 
-interface WorkOrder {
-  id: string;
-  dateReceived?: string;
-  receivedBy?: string;
-  address?: string;
-  company?: string;
-  rodzaj?: string;
-  zlecenie?: string;
-  realizationDate?: string;
-  vehicle?: string;
-  responsible?: string;
-  notes?: string;
-  completed?: boolean;
-  failureReason?: string;
-}
-
-interface WorkOrdersGridProps {
-  workOrders: WorkOrder[];
-  onToggleComplete: (order: WorkOrder, completed: boolean) => void;
-  onAssign: (order: WorkOrder) => void;
-  onMarkFailed: (order: WorkOrder) => void;
-  tabKey: string;
-  onDelete: (order: WorkOrder) => void;
-  onEdit: (order: WorkOrder) => void;
-}
-
-const headings = {
-  surowce: 'ZLECENIA ODBIORU SUROWCÓW WTÓRNYCH',
-  worki: 'ZLECENIA ODBIORU WORKÓW GRUZOWYCH',
-  uslugi: 'ZLECENIA USŁUG',
-  bramy: 'ZLECENIE ODBIORU NA BRAMĘ',
-  bezpylne: 'ZLECENIA ODBIORU NA BEZPYLNE',
-};
-
-const WorkOrdersGrid: React.FC<WorkOrdersGridProps> = ({
+export const WorkOrdersGrid = ({
   workOrders,
   onToggleComplete,
   onAssign,
   onMarkFailed,
-  tabKey,
+  onEdit,
   onDelete,
-  onEdit
+  title
 }) => {
-  // Sort orders: pending first, then completed
-  const sortedOrders = Array.isArray(workOrders) ? [...workOrders].sort((a, b) => {
-    const aCompleted = !!a.completed;
-    const bCompleted = !!b.completed;
-    if (aCompleted === bCompleted) return 0;
-    return aCompleted ? 1 : -1;
-  }) : [];
-
-  const pendingOrders = sortedOrders.filter(o => !o.completed);
-  const completedOrders = sortedOrders.filter(o => !!o.completed);
+  if (!workOrders || workOrders.length === 0) {
+    return (
+      <Card className="bg-white shadow-lg border border-gray-200 animate-fade-in">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="p-4 bg-gray-100 rounded-full mb-4">
+            <FileX className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Brak zleceń
+          </h3>
+          <p className="text-gray-500 text-center max-w-md">
+            Nie ma jeszcze żadnych zleceń w tej kategorii. Kliknij przycisk "Dodaj zlecenie", aby utworzyć pierwsze zlecenie.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">{headings[tabKey]}</h2>
-          {/* Remove or wrap the <h2 className="text-2xl font-bold text-gray-900">Zlecenia Bezpylne</h2> in a conditional so it only renders for the bezpylne tab. */}
-          <div className="text-sm text-gray-500">
-            {workOrders.length} {workOrders.length === 1 ? 'zlecenie' : 'zleceń'}
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        <div className="text-sm text-gray-500">
+          Znaleziono {workOrders.length} {workOrders.length === 1 ? 'zlecenie' : workOrders.length < 5 ? 'zlecenia' : 'zleceń'}
         </div>
       </div>
       
-      <div className="space-y-4">
-        {sortedOrders.map(order => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {workOrders.map((order, index) => (
           <WorkOrderCard
             key={order.id}
             order={order}
             onToggleComplete={onToggleComplete}
             onAssign={onAssign}
             onMarkFailed={onMarkFailed}
-            onDelete={onDelete}
             onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
-        {sortedOrders.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">Brak zleceń</div>
-          </div>
-        )}
       </div>
     </div>
   );
-};
-
-export default WorkOrdersGrid; 
+}; 

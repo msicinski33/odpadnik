@@ -77,14 +77,31 @@ const VehicleList = ({ vehicles, onEdit, onDelete, onVehicleUpdate }) => {
   const getStatusBadge = (vehicle) => {
     const isFaulty = vehicle.faultStatus === 'faulty';
     const isActive = vehicle.isActive ?? vehicle.active;
+    const latestFault = vehicle.faultReports && vehicle.faultReports.length > 0 ? vehicle.faultReports[0] : null;
     
     if (isFaulty) {
       return (
         <div className="flex items-center gap-2">
-          <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            Niesprawny
-          </span>
+          <div className="relative group">
+            <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 cursor-help">
+              <AlertTriangle className="h-3 w-3" />
+              Niesprawny
+            </span>
+            {latestFault && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                <div className="font-semibold mb-1">Przyczyna usterki:</div>
+                <div className="max-w-xs break-words">{latestFault.description}</div>
+                <div className="text-gray-300 mt-1">
+                  Zgłoszono: {new Date(latestFault.reportedAt).toLocaleDateString('pl-PL')}
+                </div>
+                <div className="text-gray-300">
+                  Przez: {latestFault.reportedBy}
+                </div>
+                {/* Arrow pointing down */}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              </div>
+            )}
+          </div>
         </div>
       );
     }

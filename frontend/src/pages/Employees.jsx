@@ -45,7 +45,9 @@ const Employees = () => {
   const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position.toLowerCase().includes(searchTerm.toLowerCase())
+    emp.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (emp.driversLicenseCategories && emp.driversLicenseCategories.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (emp.specialQualifications && emp.specialQualifications.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a, b) => {
     const sA = (a.surname || '').localeCompare(b.surname || '', 'pl');
     if (sA !== 0) return sA;
@@ -128,7 +130,10 @@ const Employees = () => {
           hasDisabilityCertificate: get(employee, 'Orzeczenie o niepełnosprawności', 'Disability', 'hasDisabilityCertificate') === 'TAK' || false,
           workHours,
           overtimeAllowed,
-          nightShiftAllowed
+          nightShiftAllowed,
+          driversLicenseCategories: get(employee, 'Kategorie prawa jazdy', 'DriversLicenseCategories', 'driversLicenseCategories') || '',
+          specialQualifications: get(employee, 'Specjalne kwalifikacje', 'SpecialQualifications', 'specialQualifications') || '',
+          vacationDays: Number(get(employee, 'Wymiar urlopu', 'VacationDays', 'vacationDays')) || 26
         }),
       });
       if (!res.ok) {
@@ -149,7 +154,7 @@ const Employees = () => {
     refetch();
   };
 
-  const employeeTemplateColumns = ['Imię / Name', 'Nazwisko / Surname', 'Stanowisko / Position', 'Telefon / Phone', 'Email'];
+  const employeeTemplateColumns = ['Imię / Name', 'Nazwisko / Surname', 'Stanowisko / Position', 'Telefon / Phone', 'Email', 'Kategorie prawa jazdy', 'Specjalne kwalifikacje', 'Wymiar urlopu'];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50">
@@ -176,7 +181,7 @@ const Employees = () => {
           title="Operacje Pracowników"
           searchValue={searchTerm}
           onSearchChange={e => setSearchTerm(e.target.value)}
-          searchPlaceholder="Szukaj pracowników po imieniu, nazwisku lub stanowisku..."
+          searchPlaceholder="Szukaj pracowników po imieniu, nazwisku, stanowisku, kategoriach prawa jazdy lub kwalifikacjach..."
           showSearch={true}
           showFilter={true}
           onFilterClick={() => {}}

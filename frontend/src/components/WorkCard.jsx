@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/Checkbox';
 import { Clock, User, Calendar, FileText, Save, Calculator, Moon, Download } from 'lucide-react';
+import MultiSelect from './ui/MultiSelect';
 
 function pad2(n) { return n < 10 ? '0' + n : n.toString(); }
 function formatNum(n) { return n.toFixed(2).replace('.', ','); }
@@ -33,6 +34,12 @@ export default function WorkCard() {
   const [restWarningMessages, setRestWarningMessages] = useState([]);
   const [employeeFilter, setEmployeeFilter] = useState("");
   const { user } = useContext(UserContext);
+
+  // Bulk export state
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState([]); // string[] of employee ids
+  const [bulkExporting, setBulkExporting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     authFetch('/api/employees').then(res => res.json()).then(setEmployees);
@@ -405,6 +412,127 @@ export default function WorkCard() {
     }
   }
 
+  // Helper: build rows for an arbitrary employee using fetched schedule and work card
+  function buildRowsForEmployee(empId, empSchedule, empWorkCard) {
+    const emp = employees.find(e => e.id === Number(empId));
+    const localDaysInMonth = new Date(Number(month.split('-')[0]), Number(month.split('-')[1]), 0).getDate();
+    const rowsLocal = [];
+    for (let day = 1; day <= localDaysInMonth; ++day) {
+      const dateStr = `${month}-${pad2(day)}`;
+      const sched = empSchedule.find(s => s.date.startsWith(dateStr));
+      let planned = null;
+      let isDyzurowy = false;
+      if (sched && (sched.customHours || sched.shift)) {
+        if (["D1", "D2", "D3"].includes(sched.shift)) {
+          isDyzurowy = true;
+          planned = null;
+        } else {
+          const adjustedShift = adjustShiftForDisability(sched.customHours || sched.shift || '', emp?.hasDisabilityCertificate);
+          planned = parseShift(adjustedShift);
+        }
+      }
+      const entry = empWorkCard.find(e => e.date.startsWith(dateStr)) || {};
+      rowsLocal.push({
+        day,
+        dateStr,
+        scheduled: planned,
+        scheduledRaw: sched ? (sched.customHours || sched.shift) : null,
+        actualFrom: entry.actualFrom || '',
+        actualTo: entry.actualTo || '',
+        actualTotal: entry.actualTotal || '',
+        absenceTypeId: entry.absenceTypeId != null ? entry.absenceTypeId : null,
+        onCall: entry.onCall || false,
+        id: entry.id,
+        shiftCode: sched ? sched.shift : null,
+        isDyzurowy,
+      });
+    }
+    return { emp, rowsLocal };
+  }
+
+  async function handleBulkExportPDFs() {
+    if (!month) return;
+    if (!bulkSelectedIds || bulkSelectedIds.length === 0) {
+      alert('Wybierz co najmniej jednego pracownika');
+      return;
+    }
+
+    setBulkExporting(true);
+    setBulkProgress({ current: 0, total: bulkSelectedIds.length });
+
+    try {
+      // Prepare all HTMLs first, then request a single ZIP
+      const ReactDOMServer = await import('react-dom/server');
+      const WorkCardPdf = (await import('./WorkCardPdf')).default;
+
+      const items = [];
+      for (let i = 0; i < bulkSelectedIds.length; i++) {
+        const empIdNum = Number(bulkSelectedIds[i]);
+        try {
+          const [schedRes, cardRes] = await Promise.all([
+            authFetch(`/api/employees/${empIdNum}/schedule?month=${month}`).then(res => res.json()),
+            authFetch(`/api/work-card/${empIdNum}?month=${month}`).then(res => res.json()),
+          ]);
+          const { emp, rowsLocal } = buildRowsForEmployee(empIdNum, schedRes, cardRes);
+
+          const htmlContent = ReactDOMServer.renderToString(
+            React.createElement(WorkCardPdf, {
+              rows: rowsLocal,
+              employee: emp,
+              month,
+              absenceTypes,
+              userName: user?.name || ''
+            })
+          );
+          const fullHtml = `
+            <html>
+              <head>
+                <meta charset="utf-8" />
+                <title>Karta pracy PDF</title>
+                <style>
+                  body { font-family: Arial, sans-serif; margin: 24px; }
+                </style>
+              </head>
+              <body>
+                ${htmlContent}
+              </body>
+            </html>
+          `;
+
+          items.push({
+            html: fullHtml,
+            fileName: `${emp?.surname || 'pracownik'}-${emp?.name || ''}_${month}.pdf`
+          });
+        } catch (e) {
+          console.error('Prepare bulk item error for employee', empIdNum, e);
+        }
+        setBulkProgress(prev => ({ current: prev.current + 1, total: prev.total }));
+      }
+
+      const response = await authFetch('/api/pdf/work-card-bulk-merged', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `karty-pracy_${month}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } finally {
+      setBulkExporting(false);
+      setBulkModalOpen(false);
+      setBulkSelectedIds([]);
+      setBulkProgress({ current: 0, total: 0 });
+    }
+  }
+
   const holidays = []; // Add holidays as needed
 
   const handleExportXLSX = async () => {
@@ -512,6 +640,14 @@ export default function WorkCard() {
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Eksportuj PDF
+              </Button>
+              <Button
+                onClick={() => setBulkModalOpen(true)}
+                size="lg"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Eksportuj wiele PDF
               </Button>
               {employeeId && (
                 <Button variant="outline" onClick={handleExportXLSX} title="Eksportuj do XLSX">
@@ -816,6 +952,70 @@ export default function WorkCard() {
                 Zapisz mimo ostrzeżenia
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Export Modal */}
+      <Dialog open={bulkModalOpen} onOpenChange={setBulkModalOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Eksport wielu kart pracy</DialogTitle>
+            <DialogDescription>Wybierz pracowników i pobierz pliki PDF dla wybranego miesiąca.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Label className="min-w-[140px]">Miesiąc</Label>
+              <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-40" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="min-w-[140px]">Filtr nazwiska</Label>
+              <Input
+                type="text"
+                placeholder="Wpisz nazwisko..."
+                value={employeeFilter}
+                onChange={e => setEmployeeFilter(e.target.value)}
+                className="flex-1"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block">Pracownicy</Label>
+              <MultiSelect
+                options={employees
+                  .filter(emp => emp.surname.toLowerCase().includes(employeeFilter.toLowerCase()))
+                  .map(emp => ({ value: String(emp.id), label: `${emp.name} ${emp.surname}` }))}
+                value={bulkSelectedIds}
+                onChange={setBulkSelectedIds}
+                placeholder="Wybierz pracowników..."
+                summaryThreshold={12}
+              />
+              <div className="mt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBulkSelectedIds(
+                    employees
+                      .filter(emp => emp.surname.toLowerCase().includes(employeeFilter.toLowerCase()))
+                      .map(emp => String(emp.id))
+                  )}
+                >
+                  Zaznacz wszystkich (wg filtra)
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setBulkSelectedIds([])}
+                >
+                  Wyczyść wybór
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkModalOpen(false)} disabled={bulkExporting}>Anuluj</Button>
+            <Button onClick={handleBulkExportPDFs} disabled={bulkExporting || bulkSelectedIds.length === 0}>
+              {bulkExporting ? `Eksportowanie (${bulkProgress.current}/${bulkProgress.total})...` : 'Eksportuj PDF'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

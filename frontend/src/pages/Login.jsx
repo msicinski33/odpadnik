@@ -27,7 +27,20 @@ const Login = ({ onLogin }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
       localStorage.setItem('token', data.token);
-      if (onLogin) onLogin(data.user);
+      // Immediately fetch full profile with permissions so sidebar renders correctly without manual reload
+      try {
+        const meRes = await fetch('http://localhost:3000/api/users/me', {
+          headers: { Authorization: `Bearer ${data.token}` },
+        });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (onLogin) onLogin(me);
+        } else {
+          if (onLogin) onLogin(data.user);
+        }
+      } catch {
+        if (onLogin) onLogin(data.user);
+      }
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);

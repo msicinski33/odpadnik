@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { authenticateToken, requireAdmin } = require('./authMiddleware');
+const { authenticateToken, requireAdmin, attachPermissions } = require('./authMiddleware');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const path = require('path');
@@ -19,15 +19,17 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Get current user profile
-router.get('/me', authenticateToken, async (req, res) => {
+// Get current user profile (with effective permissions)
+router.get('/me', authenticateToken, attachPermissions, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { id: true, name: true, email: true, role: true, avatarUrl: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    // attach effective permissions if resolved by middleware
+    const permissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    res.json({ ...user, permissions });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
