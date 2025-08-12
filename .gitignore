@@ -12,3 +12,15 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 *.log
+
+# Large files and archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.iso
+*.dmg
+
+# Uploads and documents
+uploads/documents/
+*.pdf
