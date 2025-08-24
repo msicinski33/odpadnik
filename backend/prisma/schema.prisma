@@ -20,6 +20,11 @@ model User {
   
   // Document relations
   oneTimeOrdersReceived OneTimeOrder[] @relation("ReceivedByUser")
+  
+  // Schedule change relations
+  scheduleChangeRequests ScheduleChangeRequest[] @relation("RequestedByUser")
+  managerReviews         ScheduleChangeRequest[] @relation("ManagerReviews")
+  reviewedScheduleChanges ScheduleChangeRequest[] @relation("ReviewedByUser")
 }
 
 // Dynamic RBAC
@@ -71,6 +76,7 @@ model Employee {
   assistantAssignments DailyAssignmentAssistant[]
   workCardEntries WorkCardEntry[]
   damages EmployeeDamage[]
+  scheduleChangeRequests ScheduleChangeRequest[] @relation("EmployeeScheduleRequests")
 }
 
 model Vehicle {
@@ -270,6 +276,7 @@ model RodzajAbsencji {
   color String?
   notes String?
   workCardEntries WorkCardEntry[]
+  scheduleChangeRequests ScheduleChangeRequest[]
 } 
 
 model WorkCardEntry {
@@ -373,4 +380,86 @@ model EmployeeDamage {
   updatedAt   DateTime @updatedAt
 
   employee    Employee @relation(fields: [employeeId], references: [id])
+}
+
+// Work Schedule Change Management Models
+model ScheduleChangeRequest {
+  id                Int      @id @default(autoincrement())
+  employeeId        Int
+  requestedById     Int      // User who submitted the request
+  managerId         Int?     // Manager assigned to approve
+  
+  // Change details
+  affectedDates     Json     // Array of date strings ["2024-01-15", "2024-01-16"]
+  changeType        ScheduleChangeType
+  originalShifts    Json?    // Original shift data for each date
+  newShifts         Json?    // New shift data (for change/new assignments)
+  absenceTypeId     Int?     // For absence assignments
+  reason            String?  // Reason for the change request
+  
+  // Approval workflow
+  status            ScheduleChangeStatus @default(PENDING)
+  submittedAt       DateTime @default(now())
+  reviewedAt        DateTime?
+  reviewedById      Int?     // Manager who reviewed
+  managerNotes      String?  // Manager's approval/rejection notes
+  autoApproved      Boolean  @default(false) // True if manager submitted directly
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  employee          Employee @relation("EmployeeScheduleRequests", fields: [employeeId], references: [id])
+  requestedBy       User     @relation("RequestedByUser", fields: [requestedById], references: [id])
+  manager           User?    @relation("ManagerReviews", fields: [managerId], references: [id])
+  reviewedBy        User?    @relation("ReviewedByUser", fields: [reviewedById], references: [id])
+  absenceType       RodzajAbsencji? @relation(fields: [absenceTypeId], references: [id])
+  notifications     ScheduleChangeNotification[]
+}
+
+enum ScheduleChangeType {
+  SHIFT_CHANGE     // Change existing shift
+  SHIFT_REMOVE     // Remove shift
+  ABSENCE_ASSIGN   // Assign absence
+  SHIFT_ADD        // Add new shift
+}
+
+enum ScheduleChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model ScheduleChangeNotification {
+  id                    Int      @id @default(autoincrement())
+  scheduleChangeId      Int
+  recipientEmail        String
+  recipientName         String
+  notificationType      NotificationType
+  emailSubject          String
+  emailBody             String
+  sentAt                DateTime?
+  deliveryStatus        NotificationStatus @default(PENDING)
+  errorMessage          String?
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  scheduleChange        ScheduleChangeRequest @relation(fields: [scheduleChangeId], references: [id])
+}
+
+enum NotificationType {
+  APPROVAL_REQUEST     // To manager when request is submitted
+  APPROVAL_GRANTED     // To employee when approved
+  APPROVAL_DENIED      // To employee when rejected
+  CHANGE_NOTIFICATION  // To coordinators/other recipients
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
 } 

@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { HomeIcon, UsersIcon, TruckIcon, MapIcon, RectangleGroupIcon, ChartBarIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon, ClipboardDocumentListIcon, HeartIcon, ShieldCheckIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, UsersIcon, TruckIcon, MapIcon, RectangleGroupIcon, ChartBarIcon, UserCircleIcon, Cog6ToothIcon, CalendarIcon, ClipboardDocumentListIcon, HeartIcon, ShieldCheckIcon, DocumentTextIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { NavLink } from 'react-router-dom';
 import { UserContext } from '../UserContext';
 import { hasPermission } from '../lib/utils';
@@ -13,6 +13,7 @@ const navItems = [
   { name: 'Frakcje', to: '/fractions', icon: ChartBarIcon, perm: 'fractions:read' },
   { name: 'Rodzaje absencji', to: '/absence-types', icon: HeartIcon, perm: 'employees:read' },
   { name: 'Harmonogram', to: '/waste-calendar-demo', icon: CalendarIcon, perm: 'calendar:read' },
+  { name: 'Zmiany harmonogramu', to: '/work-schedule-change', icon: ClockIcon, perm: 'employees:read' },
   { name: 'Zlecenia', to: '/WorkOrders', icon: ClipboardDocumentListIcon, perm: 'workorders:read' },
   { name: 'Jednorazowe zlecenia', to: '/one-time-orders', icon: ClipboardDocumentListIcon, perm: 'oneTimeOrders:read' },
   { name: 'Worki gruzowe', to: '/debris-bag-orders', icon: DocumentTextIcon, perm: 'debrisBagOrders:read' },

@@ -25,6 +25,7 @@ import OneTimeOrders from './pages/OneTimeOrders';
 import DebrisBagOrders from './pages/DebrisBagOrders';
 import RolesPage from './pages/Roles';
 import Forbidden from './pages/Forbidden';
+import WorkScheduleChange from './pages/WorkScheduleChange';
 import { hasPermission } from './lib/utils';
 
 const queryClient = new QueryClient();
@@ -112,6 +113,7 @@ function App() {
             <Route path="/debris-bag-orders" element={<GuardedRoute user={user} required="debrisBagOrders:read"><DebrisBagOrders /></GuardedRoute>} />
             <Route path="/users" element={<ProtectedRoute user={user}><Users /></ProtectedRoute>} />
             <Route path="/roles" element={<ProtectedRoute user={user}><RolesPage /></ProtectedRoute>} />
+            <Route path="/work-schedule-change" element={<GuardedRoute user={user} required="employees:read"><WorkScheduleChange /></GuardedRoute>} />
             <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
           </Routes>
         </div>

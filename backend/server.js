@@ -73,6 +73,7 @@ const oneTimeOrdersRouter = require('./routes/oneTimeOrders');
 const debrisBagOrdersRouter = require('./routes/debrisBagOrders');
 const damagesRouter = require('./routes/damages');
 const rolesRouter = require('./routes/roles');
+const scheduleChangesRouter = require('./routes/scheduleChanges');
 const { authenticateToken, authorizeModule, attachPermissions } = require('./routes/authMiddleware');
 
 
@@ -96,6 +97,7 @@ app.use('/api/one-time-orders', authenticateToken, attachPermissions, authorizeM
 app.use('/api/debris-bag-orders', authenticateToken, attachPermissions, authorizeModule('debrisBagOrders'), debrisBagOrdersRouter);
 app.use('/api/damages', authenticateToken, attachPermissions, authorizeModule('damages'), damagesRouter);
 app.use('/api/roles', rolesRouter);
+app.use('/api/schedule-changes', authenticateToken, attachPermissions, authorizeModule('employees'), scheduleChangesRouter);
 app.use('/api/workorders', authenticateToken, workOrdersRouter);
 app.use('/api', demoScheduleRouter);
 
