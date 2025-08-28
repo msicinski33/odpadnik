@@ -1,0 +1,22 @@
+<!-- This is a placeholder for your custom logo -->
+<!-- Replace this file with your actual logo image -->
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Placeholder for your "odppachik" logo with truck design -->
+  <rect width="200" height="60" fill="#1e293b" rx="8"/>
+  <text x="100" y="35" text-anchor="middle" fill="#06b6d4" font-family="Arial, sans-serif" font-size="16" font-weight="bold">
+    ODPPACHIK
+  </text>
+  <text x="100" y="50" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="10">
+    Waste Management
+  </text>
+</svg>
+
+
+
+
+
+
+
+
+
+

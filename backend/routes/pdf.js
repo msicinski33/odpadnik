@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken, authorize } = require('./authMiddleware');
 const puppeteer = require('puppeteer');
 const archiver = require('archiver');
 const { PDFDocument } = require('pdf-lib');
 
-router.post('/work-card', async (req, res) => {
+router.post('/work-card', authenticateToken, authorize('workCard:read'), async (req, res) => {
   try {
     const { html, fileName = 'work-card.pdf' } = req.body;
 
@@ -43,7 +44,7 @@ router.post('/work-card', async (req, res) => {
   }
 });
 
-router.post('/monthly-schedule', async (req, res) => {
+router.post('/monthly-schedule', authenticateToken, authorize('monthlyPlan:read'), async (req, res) => {
   try {
     const { html, fileName = 'monthly-schedule.pdf' } = req.body;
 
@@ -83,10 +84,91 @@ router.post('/monthly-schedule', async (req, res) => {
   }
 });
 
+router.post('/leave-planning', authenticateToken, authorize('leavePlanning:read'), async (req, res) => {
+  try {
+    const { html, fileName = 'leave-planning.pdf' } = req.body;
+
+    if (!html) {
+      return res.status(400).json({ error: 'Missing HTML content' });
+    }
+
+    // Sanitize the fileName to avoid invalid characters in headers
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A3',
+      landscape: true,
+      printBackground: true,
+      margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' },
+    });
+
+    await browser.close();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${safeFileName}"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
+// Containers PDF generation
+router.post('/containers', authenticateToken, authorize('containers:read'), async (req, res) => {
+  try {
+    const { html, fileName = 'containers.pdf' } = req.body;
+
+    if (!html) {
+      return res.status(400).json({ error: 'Missing HTML content' });
+    }
+
+    // Sanitize the fileName to avoid invalid characters in headers
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      landscape: true,
+      printBackground: true,
+      margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' },
+    });
+
+    await browser.close();
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${safeFileName}"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+
+  } catch (err) {
+    console.error('PDF generation error:', err);
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
 module.exports = router; 
 
 // Bulk work-card ZIP generation: accepts array of { html, fileName }
-router.post('/work-card-bulk-zip', async (req, res) => {
+router.post('/work-card-bulk-zip', authenticateToken, authorize('workCard:read'), async (req, res) => {
   try {
     const { items } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {
@@ -135,7 +217,7 @@ router.post('/work-card-bulk-zip', async (req, res) => {
 });
 
 // Bulk work-card merged PDF: accepts array of { html, fileName } and returns a single merged PDF
-router.post('/work-card-bulk-merged', async (req, res) => {
+router.post('/work-card-bulk-merged', authenticateToken, authorize('workCard:read'), async (req, res) => {
   try {
     const { items } = req.body || {};
     if (!Array.isArray(items) || items.length === 0) {

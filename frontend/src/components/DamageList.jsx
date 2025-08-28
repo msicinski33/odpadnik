@@ -44,7 +44,7 @@ const DamageList = ({ damages, onAddDamage, onEditDamage, onDeleteDamage, employ
     }).format(amount);
   };
 
-  const totalCost = damages.reduce((sum, damage) => sum + (damage.estimatedCost || 0), 0);
+  const totalCost = damages.reduce((sum, damage) => sum + (damage.amount || 0), 0);
   const lastDamageDate = damages.length > 0 ? damages[0].date : null;
 
   return (
@@ -113,19 +113,14 @@ const DamageList = ({ damages, onAddDamage, onEditDamage, onDeleteDamage, employ
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-sm text-gray-500">{formatDate(damage.date)}</span>
-                    {damage.estimatedCost && (
+                    {damage.amount && (
                       <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium">
-                        {formatCurrency(damage.estimatedCost)}
+                        {formatCurrency(damage.amount)}
                       </span>
                     )}
                   </div>
                   <p className="text-gray-900 mb-2">{damage.description}</p>
-                  {damage.supervisor && (
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <User className="h-3 w-3" />
-                      <span>Przełożony: {damage.supervisor}</span>
-                    </div>
-                  )}
+
                 </div>
                 <div className="flex items-center gap-2 ml-4">
                   <button

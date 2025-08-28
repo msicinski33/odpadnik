@@ -11,7 +11,7 @@ import authFetch from '../utils/authFetch';
 import DataPageHeader from '../components/ui/DataPageHeader';
 
 const fetchVehicles = async () => {
-  const response = await authFetch('http://localhost:3000/api/vehicles');
+  const response = await authFetch('/api/vehicles');
   if (!response.ok) {
     throw new Error('Błąd pobierania pojazdów');
   }
@@ -48,7 +48,7 @@ const Vehicles = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await authFetch(`http://localhost:3000/api/vehicles/${id}`, {
+      const response = await authFetch(`/api/vehicles/${id}`, {
         method: 'DELETE'
       });
       if (!response.ok) {
@@ -66,8 +66,8 @@ const Vehicles = () => {
       // Remove faultReports if present
       const { faultReports, ...cleanData } = data;
       const url = editing 
-        ? `http://localhost:3000/api/vehicles/${editing.id}`
-        : 'http://localhost:3000/api/vehicles';
+        ? `/api/vehicles/${editing.id}`
+        : '/api/vehicles';
       
       const response = await authFetch(url, {
         method: editing ? 'PUT' : 'POST',
@@ -99,7 +99,7 @@ const Vehicles = () => {
       }));
 
       const promises = mapped.map(vehicle =>
-        authFetch('http://localhost:3000/api/vehicles', {
+        authFetch('/api/vehicles', {
           method: 'POST',
           body: JSON.stringify(vehicle)
         })

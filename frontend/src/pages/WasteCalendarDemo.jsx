@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import WasteCalendar from "../components/WasteCalendar";
 import authFetch from "../utils/authFetch";
 
-const API = "http://localhost:3000/api";
+const API = "/api";
 
 const MONTH_NAMES = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",

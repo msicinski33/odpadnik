@@ -20,14 +20,13 @@ router.get('/employee/:employeeId', async (req, res) => {
 // Create a new damage record
 router.post('/', async (req, res) => {
   try {
-    const { employeeId, date, description, estimatedCost, supervisor } = req.body;
+    const { employeeId, date, description, amount } = req.body;
     const damage = await prisma.employeeDamage.create({
       data: {
         employeeId: parseInt(employeeId),
         date: new Date(date),
         description,
-        estimatedCost: estimatedCost ? parseFloat(estimatedCost) : null,
-        supervisor
+        amount: amount ? parseFloat(amount) : null
       }
     });
     res.json(damage);
@@ -40,14 +39,13 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { date, description, estimatedCost, supervisor } = req.body;
+    const { date, description, amount } = req.body;
     const damage = await prisma.employeeDamage.update({
       where: { id: parseInt(id) },
       data: {
         date: new Date(date),
         description,
-        estimatedCost: estimatedCost ? parseFloat(estimatedCost) : null,
-        supervisor
+        amount: amount ? parseFloat(amount) : null
       }
     });
     res.json(damage);

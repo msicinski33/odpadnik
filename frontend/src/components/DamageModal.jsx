@@ -5,8 +5,7 @@ const DamageModal = ({ isOpen, onClose, onSubmit, initialData, employeeName }) =
   const [form, setForm] = useState({
     date: '',
     description: '',
-    estimatedCost: '',
-    supervisor: ''
+    amount: ''
   });
 
   useEffect(() => {
@@ -14,15 +13,13 @@ const DamageModal = ({ isOpen, onClose, onSubmit, initialData, employeeName }) =
       setForm({
         date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : '',
         description: initialData.description || '',
-        estimatedCost: initialData.estimatedCost || '',
-        supervisor: initialData.supervisor || ''
+        amount: initialData.amount || ''
       });
     } else {
       setForm({
         date: new Date().toISOString().split('T')[0],
         description: '',
-        estimatedCost: '',
-        supervisor: ''
+        amount: ''
       });
     }
   }, [initialData]);
@@ -31,7 +28,7 @@ const DamageModal = ({ isOpen, onClose, onSubmit, initialData, employeeName }) =
     e.preventDefault();
     onSubmit({
       ...form,
-      estimatedCost: form.estimatedCost ? parseFloat(form.estimatedCost) : null
+      amount: form.amount ? parseFloat(form.amount) : null
     });
   };
 
@@ -88,28 +85,16 @@ const DamageModal = ({ isOpen, onClose, onSubmit, initialData, employeeName }) =
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Szacowany koszt (zł)</label>
+              <label className="block text-sm font-semibold mb-2">Koszt (zł)</label>
               <input
-                name="estimatedCost"
+                name="amount"
                 type="number"
                 step="0.01"
                 min="0"
-                value={form.estimatedCost}
-                onChange={(e) => setForm({ ...form, estimatedCost: e.target.value })}
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
                 placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">Odpowiedzialny przełożony</label>
-              <input
-                name="supervisor"
-                type="text"
-                value={form.supervisor}
-                onChange={(e) => setForm({ ...form, supervisor: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200"
-                placeholder="Imię i nazwisko przełożonego"
               />
             </div>
           </div>

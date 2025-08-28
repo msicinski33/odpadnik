@@ -11,9 +11,9 @@ import DataPageHeader from '../components/ui/DataPageHeader';
 import SimpleModal from '../components/SimpleModal';
 import RegionImportModal from '../components/RegionImportModal';
 
-const API_URL = 'http://localhost:3000/api/regions';
-const POINTS_URL = 'http://localhost:3000/api/points';
-const FRACTIONS_URL = 'http://localhost:3000/api/fractions';
+const API_URL = '/api/regions';
+const POINTS_URL = '/api/points';
+const FRACTIONS_URL = '/api/fractions';
 
 const Regions = () => {
   const [regions, setRegions] = useState([]);

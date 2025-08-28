@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Users, Car, Building, Calendar, TrendingUp, Activity, MapPin, Clock, CheckCircle2, FileText } from 'lucide-react';
+import { BarChart3, Users, Car, Building, Calendar, TrendingUp, Activity, MapPin, Clock, CheckCircle2, FileText, Snowflake } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import authFetch from '../utils/authFetch';
 import CountUp from '../components/CountUp';
@@ -14,23 +14,23 @@ const fetchCount = async (url) => {
 const Dashboard = () => {
   const { data: employees = [], isLoading: loadingEmp } = useQuery({
     queryKey: ['employees'],
-    queryFn: () => fetchCount('http://localhost:3000/api/employees'),
+    queryFn: () => fetchCount('/api/employees'),
   });
   const { data: vehicles = [], isLoading: loadingVeh } = useQuery({
     queryKey: ['vehicles'],
-    queryFn: () => fetchCount('http://localhost:3000/api/vehicles'),
+    queryFn: () => fetchCount('/api/vehicles'),
   });
   const { data: points = [], isLoading: loadingPts } = useQuery({
     queryKey: ['points'],
-    queryFn: () => fetchCount('http://localhost:3000/api/points'),
+    queryFn: () => fetchCount('/api/points'),
   });
   const { data: regions = [], isLoading: loadingReg } = useQuery({
     queryKey: ['regions'],
-    queryFn: () => fetchCount('http://localhost:3000/api/regions'),
+    queryFn: () => fetchCount('/api/regions'),
   });
   const { data: todaySchedule = [], isLoading: loadingToday } = useQuery({
     queryKey: ['today-schedule'],
-    queryFn: () => fetchCount('http://localhost:3000/api/calendar/today'),
+    queryFn: () => fetchCount('/api/calendar/today'),
   });
 
   return (
@@ -65,7 +65,7 @@ const Dashboard = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Main Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           <Link to="/MonthlySchedule" className="block group">
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow-xl hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 min-h-[260px]">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-transparent"></div>
@@ -118,6 +118,30 @@ const Dashboard = () => {
             </div>
           </Link>
 
+          <Link to="/leave-planning" className="block group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-xl hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 min-h-[260px]">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-transparent"></div>
+              <div className="relative p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <Calendar className="h-6 w-6" />
+                  </div>
+                  <Users className="h-5 w-5 opacity-70" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Planowanie Urlopów</h3>
+                <p className="text-emerald-100 text-sm mb-4">Zarządzanie harmonogramem urlopów pracowników</p>
+                <div className="flex items-center justify-between">
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                    Nowy moduł
+                  </span>
+                  <span className="text-xs opacity-70 group-hover:opacity-100 transition-opacity">
+                    Zarządzaj urlopami →
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Link>
+
           <Link to="/trasowka" className="block group">
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 via-orange-600 to-red-600 text-white shadow-xl hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 min-h-[260px]">
               <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 to-transparent"></div>
@@ -137,6 +161,39 @@ const Dashboard = () => {
                   <span className="text-xs opacity-70 group-hover:opacity-100 transition-opacity">
                     Generuj PDF →
                   </span>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          <Link to="/winter-action" className="block group">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-600 to-blue-700 text-white shadow-xl hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-300 min-h-[260px]">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-transparent"></div>
+              <div className="absolute top-4 right-4 opacity-10">
+                <Snowflake className="h-20 w-20" />
+              </div>
+              <div className="relative p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <Snowflake className="h-6 w-6" />
+                  </div>
+                  <Activity className="h-5 w-5 opacity-70" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">❄️ Akcja Zima</h3>
+                <p className="text-blue-100 text-sm mb-4">Centrum dowodzenia zimowego</p>
+                <div className="flex items-center justify-between">
+                  <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+                    Moduł zimowy
+                  </span>
+                  <span className="text-xs opacity-70 group-hover:opacity-100 transition-opacity">
+                    Centrum operacji →
+                  </span>
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center text-xs text-blue-200">
+                    <div className="w-1.5 h-1.5 bg-blue-300 rounded-full mr-2"></div>
+                    <span>10 modułów operacyjnych</span>
+                  </div>
                 </div>
               </div>
             </div>

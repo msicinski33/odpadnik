@@ -26,7 +26,7 @@ const VehicleList = ({ vehicles, onEdit, onDelete, onVehicleUpdate }) => {
   const resolveVehicleFault = async (vehicleId) => {
     try {
       setIsSubmitting(true);
-      const response = await authFetch(`http://localhost:3000/api/vehicles/${vehicleId}/fault/resolve`, {
+      const response = await authFetch(`/api/vehicles/${vehicleId}/fault/resolve`, {
         method: 'PUT'
       });
       
@@ -48,7 +48,7 @@ const VehicleList = ({ vehicles, onEdit, onDelete, onVehicleUpdate }) => {
 
     try {
       setIsSubmitting(true);
-      const response = await authFetch(`http://localhost:3000/api/vehicles/${selectedVehicle.id}/fault`, {
+      const response = await authFetch(`/api/vehicles/${selectedVehicle.id}/fault`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

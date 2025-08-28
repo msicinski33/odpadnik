@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 import SimpleModal from '../components/SimpleModal';
 import ReactMarkdown from 'react-markdown';
+import authFetch from '../utils/authFetch';
 
 const EQUIPMENT_LIST = [
   { name: 'miotła' },
@@ -29,13 +30,13 @@ const DailyPlanSprzatanie = ({ date }) => {
   const [workTypeValue, setWorkTypeValue] = useState('');
 
   useEffect(() => {
-    fetch('/api/municipalities')
+    authFetch('/api/municipalities')
       .then(res => res.json())
       .then(data => setMunicipalityOptions(Array.isArray(data) ? data : []));
   }, []);
 
   useEffect(() => {
-    fetch(`/api/dailyAssignments?date=${date}&type=sprzątanie`)
+    authFetch(`/api/dailyAssignments?date=${date}&type=sprzątanie`)
       .then(res => res.json())
       .then(data => {
         setAssignments(Array.isArray(data) ? data : []);
@@ -65,7 +66,7 @@ const DailyPlanSprzatanie = ({ date }) => {
   const handleCellSave = async (value) => {
     if (activeField === 'kierowca' && value && value.id) {
       try {
-        const res = await fetch(`/api/employees/schedule/by-date?date=${date}`);
+        const res = await authFetch(`/api/employees/schedule/by-date?date=${date}`);
         const data = await res.json();
         const driver = data.find(e => String(e.id) === String(value.id));
         const shift = driver && driver.shift ? driver.shift : '6-14';
@@ -100,7 +101,7 @@ const DailyPlanSprzatanie = ({ date }) => {
         workType: value.workType || '',
         type: 'sprzątanie',
       };
-      await fetch(`/api/dailyAssignments/${editRowId}`, {
+      await authFetch(`/api/dailyAssignments/${editRowId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedAssignment),
@@ -124,7 +125,7 @@ const DailyPlanSprzatanie = ({ date }) => {
         date: new Date(date).toISOString(),
         type: 'sprzątanie',
       };
-      const res = await fetch('/api/dailyAssignments', {
+      const res = await authFetch('/api/dailyAssignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAssignment),
@@ -146,7 +147,7 @@ const DailyPlanSprzatanie = ({ date }) => {
 
   const handleDelete = (assignment) => {
     if (!window.confirm('Czy na pewno chcesz usunąć ten przydział?')) return;
-    fetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' })
+    authFetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' })
       .then(res => {
         if (res.ok) {
           setAssignments(assignments => assignments.filter(a => a.id !== assignment.id));

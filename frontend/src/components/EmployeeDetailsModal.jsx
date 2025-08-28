@@ -89,7 +89,7 @@ const EmployeeDetailsModal = ({ isOpen, onClose, employee, onUpdateEmployee }) =
     return new Date(dateString).toLocaleDateString('pl-PL');
   };
 
-  const totalDamageCost = damages.reduce((sum, damage) => sum + (damage.estimatedCost || 0), 0);
+      const totalDamageCost = damages.reduce((sum, damage) => sum + (damage.amount || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">

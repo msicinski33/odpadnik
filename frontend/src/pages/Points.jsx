@@ -10,7 +10,7 @@ import PointDetails from '../components/PointDetails';
 import { MapPin, Building2, Home, ArrowLeft, TrendingUp, BarChart3, Activity, AlertCircle } from 'lucide-react';
 import DataPageHeader from '../components/ui/DataPageHeader';
 
-const API_URL = 'http://localhost:3000/api/points';
+const API_URL = '/api/points';
 
 const Points = ({ type: initialType }) => {
   const [type, setType] = useState(initialType || '');
@@ -28,10 +28,10 @@ const Points = ({ type: initialType }) => {
     async function fetchStats() {
       try {
         const [totalRes, zonesRes, resRes, comRes] = await Promise.all([
-          authFetch('http://localhost:3000/api/points/stats/total'),
-          authFetch('http://localhost:3000/api/points/stats/active-zones'),
-          authFetch('http://localhost:3000/api/points/type/zamieszkala'),
-          authFetch('http://localhost:3000/api/points/type/niezamieszkala'),
+          authFetch('/api/points/stats/total'),
+          authFetch('/api/points/stats/active-zones'),
+          authFetch('/api/points/type/zamieszkala'),
+          authFetch('/api/points/type/niezamieszkala'),
         ]);
         const totalData = await totalRes.json();
         const zonesData = await zonesRes.json();
@@ -58,7 +58,7 @@ const Points = ({ type: initialType }) => {
   useEffect(() => {
     if (type) {
       // Fetch points for selected type
-      authFetch(`http://localhost:3000/api/points/type/${type}`)
+      authFetch(`/api/points/type/${type}`)
         .then(res => res.json())
         .then(data => setPoints(data))
         .catch(() => setPoints([]));

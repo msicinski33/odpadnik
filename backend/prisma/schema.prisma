@@ -8,115 +8,139 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  role      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  avatarUrl String?
-  isActive  Boolean  @default(true)
-  
-  // Document relations
-  oneTimeOrdersReceived OneTimeOrder[] @relation("ReceivedByUser")
+  id                      Int                     @id @default(autoincrement())
+  name                    String
+  email                   String                  @unique
+  password                String
+  role                    String
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  avatarUrl               String?
+  isActive                Boolean                 @default(true)
+  leaveApprovals          LeaveEntry[]            @relation("LeaveApprovals")
+  oneTimeOrdersReceived   OneTimeOrder[]          @relation("ReceivedByUser")
+  scheduleChangeApprovals ScheduleChangeRequest[] @relation("ScheduleChangeApprover")
+  scheduleChangeRequests  ScheduleChangeRequest[] @relation("ScheduleChangeRequester")
+  winterStatusReports     WinterVehicleStatus[]   @relation("WinterStatusReporter")
+  winterVehicleStatusReports WinterVehicleStatusHistory[] @relation("WinterStatusReporter")
 }
 
-// Dynamic RBAC
 model Role {
-  id          Int    @id @default(autoincrement())
-  name        String @unique
-  description String?
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  description     String?
   rolePermissions RolePermission[]
 }
 
 model Permission {
-  id      Int    @id @default(autoincrement())
-  module  String // e.g. 'employees', 'vehicles', '*'
-  action  String // 'read' | 'create' | 'update' | 'delete' | '*'
+  id              Int              @id @default(autoincrement())
+  module          String
+  action          String
   rolePermissions RolePermission[]
+
   @@unique([module, action])
 }
 
 model RolePermission {
   roleId       Int
   permissionId Int
-  role         Role       @relation(fields: [roleId], references: [id])
   permission   Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
+
   @@id([roleId, permissionId])
 }
 
 model Employee {
-  id        Int      @id @default(autoincrement())
-  name      String
-  surname   String
-  position  String
-  phone     String
-  email     String?
-  hiredAt   DateTime?
-  terminatedAt DateTime?
-  notes     String?
-  hasDisabilityCertificate Boolean @default(false)
-  workHours               Int     @default(8) // 7 or 8
-  overtimeAllowed         Boolean @default(false)
-  nightShiftAllowed       Boolean @default(false)
-  // Driver's license categories (comma-separated string)
-  driversLicenseCategories String? // e.g., "B,C,D,E"
-  // Special qualifications (comma-separated string)
-  specialQualifications    String? // e.g., "ADR,HAZMAT,CRANE"
-  // Vacation allowance in days
-  vacationDays            Int?     @default(26) // Default 26 days per year
-  employeeSchedules EmployeeSchedule[]
-  drivenAssignments DailyAssignment[] @relation("DriverAssignments")
-  assistantAssignments DailyAssignmentAssistant[]
-  workCardEntries WorkCardEntry[]
-  damages EmployeeDamage[]
+  id                       Int                        @id @default(autoincrement())
+  name                     String
+  surname                  String
+  position                 String
+  phone                    String
+  email                    String?
+  hiredAt                  DateTime?
+  terminatedAt             DateTime?
+  notes                    String?
+  hasDisabilityCertificate Boolean                    @default(false)
+  workHours                Int                        @default(8)
+  overtimeAllowed          Boolean                    @default(false)
+  nightShiftAllowed        Boolean                    @default(false)
+  driversLicenseCategories String?
+  specialQualifications    String?
+  vacationDays             Int?                       @default(26)
+  drivenAssignments        DailyAssignment[]          @relation("DriverAssignments")
+  assistantAssignments     DailyAssignmentAssistant[]
+  damages                  EmployeeDamage[]
+  employeeSchedules        EmployeeSchedule[]
+  leavePlans               LeavePlan[]
+  scheduleChangeRequests   ScheduleChangeRequest[]    @relation("ScheduleChangeEmployee")
+  workCardEntries          WorkCardEntry[]
+  winterRouteAssignments   WinterRouteAssignment[]    @relation("WinterRouteDriver")
+  winterSidewalkWork       WinterSidewalkAssignment[] @relation("WinterSidewalkWorker")
+  winterBusStopWork        WinterBusStopAssignment[]  @relation("WinterBusStopWorker")
+  winterMaterialOperations WinterMaterialConsumption[] @relation("WinterMaterialOperator")
+  winterPlanSupervision    WinterDailyPlan[]          @relation("WinterPlanSupervisor")
+  winterDailyDriver        WinterDailyPlanAssignment[] @relation("WinterDailyDriver")
+  winterDailyLoader        WinterDailyPlanAssignment[] @relation("WinterDailyLoader")
+  // New winter vehicle relations
+  winterVehicleRouteAssignments WinterVehicleRouteAssignment[] @relation("WinterVehicleRouteDriver")
+  winterVehicleMaterialOps WinterVehicleMaterialConsumption[] @relation("WinterVehicleMaterialOperator")
+  winterVehicleDailyDriver WinterVehicleDailyAssignment[] @relation("WinterVehicleDailyDriver")
+  winterVehicleDailyLoader WinterVehicleDailyAssignment[] @relation("WinterVehicleDailyLoader")
 }
 
 model Vehicle {
-  id                Int    @id @default(autoincrement())
-  brand             String
-  registrationNumber String @unique
-  vehicleType       String
-  capacity          Float
-  fuelType          String
-  purchaseDate      DateTime?
-  isActive          Boolean @default(true)
-  faultStatus       String  @default("operational") // "operational" | "faulty"
-  dailyAssignments DailyAssignment[]
-  faultReports     VehicleFaultReport[]
-  deliveryVehicle   OneTimeOrder[] @relation("DeliveryVehicle")
-  pickupVehicle     OneTimeOrder[] @relation("PickupVehicle")
-  debrisBagOrders   DebrisBagOrder[]
+  id                 Int                  @id @default(autoincrement())
+  brand              String
+  registrationNumber String               @unique
+  vehicleType        String
+  capacity           Float
+  fuelType           String
+  purchaseDate       DateTime?
+  isActive           Boolean              @default(true)
+  faultStatus        String               @default("operational")
+  dailyAssignments   DailyAssignment[]
+  debrisBagOrders    DebrisBagOrder[]
+  pickupVehicle      OneTimeOrder[]       @relation("PickupVehicle")
+  deliveryVehicle    OneTimeOrder[]       @relation("DeliveryVehicle")
+  faultReports       VehicleFaultReport[]
+  winterStatusHistory WinterVehicleStatus[]
+  winterRouteAssignments WinterRouteAssignment[]
+  winterMaterialConsumption WinterMaterialConsumption[]
+  winterDailyAssignments WinterDailyPlanAssignment[]
 }
 
 model Region {
-  id        Int    @id @default(autoincrement())
-  name      String
-  unitName  String
-  notes     String?
-  
-  points    Point[]
-  regionFractions RegionFraction[]
-  calendarEntries CalendarEntry[]
+  id               Int               @id @default(autoincrement())
+  name             String
+  unitName         String
+  notes            String?
+  calendarEntries  CalendarEntry[]
   dailyAssignments DailyAssignment[]
+  points           Point[]
+  regionFractions  RegionFraction[]
+  winterRoutes     WinterRoute[]
+  winterSidewalks  WinterSidewalk[]
+  winterBusStops   WinterBusStop[]
+  winterRoadInventory WinterRoadInventory[]
+  winterDailyAssignments WinterDailyPlanAssignment[]
+  // New winter vehicle relations
+  winterVehicleDailyAssignments WinterVehicleDailyAssignment[]
 }
 
 model Fraction {
-  id      Int    @id @default(autoincrement())
-  name    String
-  code    String
-  color   String
-
-  pointFractions PointFraction[]
-  regionFractions RegionFraction[]
-  calendarEntries CalendarEntry[]
+  id                     Int                       @id @default(autoincrement())
+  name                   String
+  code                   String
+  color                  String
+  calendarEntries        CalendarEntry[]
   fractionsInAssignments DailyAssignmentFraction[]
+  pointFractions         PointFraction[]
+  regionFractions        RegionFraction[]
 }
 
 model Point {
-  id             Int      @id @default(autoincrement())
-  type           String   // 'zamieszkala' | 'niezamieszkala'
+  id             Int             @id @default(autoincrement())
+  type           String
   town           String
   street         String
   number         String
@@ -125,12 +149,10 @@ model Point {
   activityNotes  String?
   startDate      DateTime?
   endDate        DateTime?
-  isIndefinite   Boolean  @default(false)
-  kompostownik   Boolean  @default(false)
-  
+  isIndefinite   Boolean         @default(false)
+  kompostownik   Boolean         @default(false)
   regionId       Int?
-  region         Region?   @relation(fields: [regionId], references: [id])
-
+  region         Region?         @relation(fields: [regionId], references: [id])
   pointFractions PointFraction[]
 }
 
@@ -140,9 +162,8 @@ model PointFraction {
   fractionId      Int
   containerSize   String
   pickupFrequency String
-
-  point           Point    @relation(fields: [pointId], references: [id])
   fraction        Fraction @relation(fields: [fractionId], references: [id])
+  point           Point    @relation(fields: [pointId], references: [id])
 }
 
 model EmployeeSchedule {
@@ -152,7 +173,6 @@ model EmployeeSchedule {
   shift       String
   customHours String?
   colorCode   String?
-
   employee    Employee @relation(fields: [employeeId], references: [id])
 }
 
@@ -160,9 +180,8 @@ model RegionFraction {
   id         Int      @id @default(autoincrement())
   regionId   Int
   fractionId Int
-
-  region     Region   @relation(fields: [regionId], references: [id])
   fraction   Fraction @relation(fields: [fractionId], references: [id])
+  region     Region   @relation(fields: [regionId], references: [id])
 
   @@unique([regionId, fractionId])
 }
@@ -172,194 +191,168 @@ model CalendarEntry {
   regionId   Int
   fractionId Int
   date       DateTime
-
-  region     Region   @relation(fields: [regionId], references: [id])
   fraction   Fraction @relation(fields: [fractionId], references: [id])
+  region     Region   @relation(fields: [regionId], references: [id])
 
   @@unique([regionId, fractionId, date])
 }
 
 model DailyAssignment {
-  id             Int      @id @default(autoincrement())
+  id             Int                        @id @default(autoincrement())
   date           DateTime
   regionId       Int
   vehicleId      Int
   driverId       Int?
-  type           DailyAssignmentType
+  type           String
   shift          String
   municipalityId Int?
-  municipality   Municipality? @relation(fields: [municipalityId], references: [id])
-  equipment      Json?   // For sprzątanie: array of { name, quantity }
-  workType       String? // For sprzątanie: free text
-  region         Region   @relation(fields: [regionId], references: [id])
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id])
-  driver         Employee? @relation("DriverAssignments", fields: [driverId], references: [id])
+  equipment      Json?
+  workType       String?
+  driver         Employee?                  @relation("DriverAssignments", fields: [driverId], references: [id])
+  vehicle        Vehicle                    @relation(fields: [vehicleId], references: [id])
+  region         Region                     @relation(fields: [regionId], references: [id])
+  municipality   Municipality?              @relation(fields: [municipalityId], references: [id])
   assistants     DailyAssignmentAssistant[]
   fractions      DailyAssignmentFraction[]
-}
-
-enum DailyAssignmentType {
-  bezpylne
-  sprzątanie
 }
 
 model DailyAssignmentAssistant {
   id                Int             @id @default(autoincrement())
   dailyAssignmentId Int
   employeeId        Int
-
-  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
   employee          Employee        @relation(fields: [employeeId], references: [id])
+  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
 }
 
 model DailyAssignmentFraction {
   id                Int             @id @default(autoincrement())
   dailyAssignmentId Int
   fractionId        Int
-  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
   fraction          Fraction        @relation(fields: [fractionId], references: [id])
+  dailyAssignment   DailyAssignment @relation(fields: [dailyAssignmentId], references: [id])
 }
 
 model VehicleFaultReport {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   vehicleId   Int
-  reportedBy  String   // User name who reported the fault
+  reportedBy  String
   description String?
-  reportedAt  DateTime @default(now())
+  reportedAt  DateTime  @default(now())
   resolvedAt  DateTime?
-  isResolved  Boolean  @default(false)
-  
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
-} 
+  isResolved  Boolean   @default(false)
+  vehicle     Vehicle   @relation(fields: [vehicleId], references: [id])
+}
 
 model WorkOrder {
-  id             Int      @id @default(autoincrement())
-  type           String   // surowce, uslugi, worki, bramy, bezpylne
-  dateReceived   DateTime
-  realizationDate DateTime? // data realizacji
-  quantity       Int?       // ilość
-  orderNumber    String?    // numer zlecenia/KPO
-  bagNumber      String?    // numer worka
-  executionDate  DateTime   // legacy, for other types
-  receivedBy     String
-  address        String
-  municipality   String?
-  company        String?
-  wasteType      String?   // surowce, worki, etc.
-  rodzaj         String?   // surowce only, or worki: M, M (99 zł), D
-  kontener       String?   // dla uslugi, bramy
-  description    String?   // legacy
-  notes          String?   // uwagi
-  failureReason  String?   // powód niezrealizowania
-  vehicle        String?
-  responsible    String?
-  completed      Boolean   @default(false)
-  zlecenie       String?   // tylko dla bezpylne
-} 
+  id              Int       @id @default(autoincrement())
+  type            String
+  dateReceived    DateTime
+  executionDate   DateTime
+  receivedBy      String
+  address         String
+  municipality    String?
+  company         String?
+  wasteType       String?
+  rodzaj          String?
+  description     String?
+  vehicle         String?
+  responsible     String?
+  completed       Boolean   @default(false)
+  failureReason   String?
+  notes           String?
+  bagNumber       String?
+  orderNumber     String?
+  quantity        Int?
+  realizationDate DateTime?
+  kontener        String?
+  zlecenie        String?
+}
 
 model Municipality {
-  id              Int              @id @default(autoincrement())
-  name            String
+  id               Int               @id @default(autoincrement())
+  name             String
   dailyAssignments DailyAssignment[]
-} 
+}
 
 model RodzajAbsencji {
-  id    Int    @id @default(autoincrement())
-  name  String
-  code  String?
-  color String?
-  notes String?
-  workCardEntries WorkCardEntry[]
-} 
+  id                     Int                     @id @default(autoincrement())
+  name                   String
+  code                   String?
+  color                  String?
+  notes                  String?
+  scheduleChangeRequests ScheduleChangeRequest[]
+  workCardEntries        WorkCardEntry[]
+}
 
 model WorkCardEntry {
-  id            Int      @id @default(autoincrement())
+  id            Int             @id @default(autoincrement())
   employeeId    Int
   date          DateTime
-  actualFrom    String?  // e.g., "07:00"
-  actualTo      String?  // e.g., "15:00"
-  actualTotal   Float?   // e.g., 8.0
-  absenceTypeId Int?     // nullable, FK to RodzajAbsencji
-  onCall        Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  employee      Employee        @relation(fields: [employeeId], references: [id])
+  actualFrom    String?
+  actualTo      String?
+  actualTotal   Float?
+  absenceTypeId Int?
+  onCall        Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   absenceType   RodzajAbsencji? @relation(fields: [absenceTypeId], references: [id])
+  employee      Employee        @relation(fields: [employeeId], references: [id])
 
   @@unique([employeeId, date])
 }
 
-// --- One-Time Orders Outside the Contract ---
-
-enum OrderStatus {
-  AWAITING_EXECUTION
-  CONTAINER_DELIVERED
-  AWAITING_COMPLETION
-  COMPLETED
-  CANCELLED
-}
-
 model OneTimeOrder {
-  id                Int         @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   dateReceived      DateTime
   receivedById      Int
-  receivedBy        User        @relation("ReceivedByUser", fields: [receivedById], references: [id])
   deliveryDate      DateTime
-  pdfFile           String?     // Path to uploaded PDF
+  pdfFile           String?
   clientCode        String
   orderingPerson    String
   address           String
   phone             String
   containerType     String
   wasteType         String
-  status            OrderStatus @default(AWAITING_EXECUTION)
-  deliveryVehicleId Int?        // Vehicle for delivery
-  deliveryVehicle   Vehicle?    @relation("DeliveryVehicle", fields: [deliveryVehicleId], references: [id])
-  pickupVehicleId   Int?        // Vehicle for pickup
-  pickupVehicle     Vehicle?    @relation("PickupVehicle", fields: [pickupVehicleId], references: [id])
+  status            String    @default("AWAITING_EXECUTION")
+  deliveryVehicleId Int?
+  pickupVehicleId   Int?
   pickupDate        DateTime?
   invoiceNumber     String?
   completedAt       DateTime?
-  notes             String?     // Uwagi
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-} 
-
-model DebrisBagOrder {
-  id                 Int      @id @default(autoincrement())
-  clientRecordNumber String   // Internal ID from contractor/client database
-  clientName         String   // Full name / company name
-  clientPhone        String   // Phone number
-  clientAddress      String   // Residential address
-  renovationAddress  String   // Renovation address (can differ)
-  paymentType        String   // Card, Bank Transfer, or Manual
-  paymentAmount      Float?   // Manual amount entry (if needed)
-  orderNumber        String   // Internal or client-provided order identifier
-  dateReceived       DateTime // When the order was accepted
-  numberOfBags       Int      // How many debris bags are requested
-  bagType            String   // M (small) or D (large)
-  bagNumber          String?  // Unique identifier (if pre-labeled)
-  price              Float?   // Per bag or total cost
-  notes              String?  // Any remarks, delivery instructions, etc.
-
-  // Completion fields
-  serviceExecutionDate DateTime? // When the bags were collected
-  kpoNumber            String?   // Waste transfer card (KPO)
-  vehicleId            Int?      // Vehicle (plate number) that performed the service
-  vehicle              Vehicle?  @relation(fields: [vehicleId], references: [id])
-  bagsCollected        Int?      // Number of bags actually collected
-  invoiceIssueDate     DateTime? // When the invoice was created
-  invoiceNumber        String?   // Reference to financial system
-
-  status               DebrisBagOrderStatus @default(PENDING_COMPLETION)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  pickupVehicle     Vehicle?  @relation("PickupVehicle", fields: [pickupVehicleId], references: [id])
+  deliveryVehicle   Vehicle?  @relation("DeliveryVehicle", fields: [deliveryVehicleId], references: [id])
+  receivedBy        User      @relation("ReceivedByUser", fields: [receivedById], references: [id])
 }
 
-enum DebrisBagOrderStatus {
-  PENDING_COMPLETION
-  COMPLETED
+model DebrisBagOrder {
+  id                   Int       @id @default(autoincrement())
+  clientRecordNumber   String
+  clientName           String
+  clientPhone          String
+  clientAddress        String
+  renovationAddress    String
+  paymentType          String
+  paymentAmount        Float?
+  orderNumber          String
+  dateReceived         DateTime
+  numberOfBags         Int
+  bagType              String
+  bagNumber            String?
+  price                Float?
+  notes                String?
+  serviceExecutionDate DateTime?
+  kpoNumber            String?
+  vehicleId            Int?
+  bagsCollected        Int?
+  invoiceIssueDate     DateTime?
+  invoiceNumber        String?
+  status               String    @default("PENDING_COMPLETION")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  vehicle              Vehicle?  @relation(fields: [vehicleId], references: [id])
 }
 
 model EmployeeDamage {
@@ -367,10 +360,479 @@ model EmployeeDamage {
   employeeId  Int
   date        DateTime
   description String
-  estimatedCost Float?
-  supervisor   String?
+  amount      Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   employee    Employee @relation(fields: [employeeId], references: [id])
-} 
+}
+
+model LeavePlan {
+  id               Int          @id @default(autoincrement())
+  employeeId       Int
+  year             Int
+  totalEntitlement Int
+  carriedOver      Int          @default(0)
+  totalAvailable   Int
+  daysUsed         Int          @default(0)
+  daysRemaining    Int
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  leaveEntries     LeaveEntry[]
+  employee         Employee     @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, year])
+}
+
+model LeaveEntry {
+  id          Int       @id @default(autoincrement())
+  leavePlanId Int
+  startDate   DateTime
+  endDate     DateTime
+  daysCount   Int
+  leaveType   String    @default("ANNUAL_LEAVE")
+  status      String    @default("PENDING")
+  approvedBy  Int?
+  approvedAt  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  approver    User?     @relation("LeaveApprovals", fields: [approvedBy], references: [id])
+  leavePlan   LeavePlan @relation(fields: [leavePlanId], references: [id])
+
+  @@unique([leavePlanId, startDate, endDate])
+}
+
+model Container {
+  id              Int       @id @default(autoincrement())
+  entryDate       DateTime  @default(now())
+  companyName     String
+  city            String
+  propertyAddress String
+  containerType   String
+  quantity        Int
+  reason          String
+  invoiceNumber   String?
+  entryPersonData String
+  additionalInfo  String?
+  personalPickup  Boolean   @default(false)
+  recordNumber    String?
+  completionDate  DateTime?
+  status          String    @default("PENDING")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ScheduleChangeRequest {
+  id                Int                 @id @default(autoincrement())
+  employeeId        Int
+  requestedById     Int
+  changeType        String
+  status            String              @default("PENDING")
+  startDate         DateTime
+  endDate           DateTime
+  originalShift     String?
+  newShift          String?
+  absenceTypeId     Int?
+  reason            String
+  description       String?
+  approvedById      Int?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  emailSent         Boolean             @default(false)
+  approvalEmailSent Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  changeDays        ScheduleChangeDay[]
+  absenceType       RodzajAbsencji?     @relation(fields: [absenceTypeId], references: [id])
+  approvedBy        User?               @relation("ScheduleChangeApprover", fields: [approvedById], references: [id])
+  requestedBy       User                @relation("ScheduleChangeRequester", fields: [requestedById], references: [id])
+  employee          Employee            @relation("ScheduleChangeEmployee", fields: [employeeId], references: [id])
+}
+
+model ScheduleChangeDay {
+  id                    Int                   @id @default(autoincrement())
+  scheduleChangeId      Int
+  date                  DateTime
+  originalShift         String?
+  newShift              String?
+  applied               Boolean               @default(false)
+  appliedAt             DateTime?
+  scheduleChangeRequest ScheduleChangeRequest @relation(fields: [scheduleChangeId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleChangeId, date])
+}
+
+model ScheduleChangeNotificationConfig {
+  id               Int      @id @default(autoincrement())
+  role             String
+  email            String
+  notifyOnNew      Boolean  @default(true)
+  notifyOnApproval Boolean  @default(true)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([role, email])
+}
+
+// ============================================
+// WINTER ACTION MODULE MODELS
+// ============================================
+
+// Separate winter vehicle fleet (independent from regular waste vehicles)
+model WinterVehicle {
+  id                     Int                                @id @default(autoincrement())
+  brand                  String
+  registrationNumber     String                             @unique
+  vehicleType            String
+  capacity               Float
+  fuelType               String
+  winterEquipment        String?                            // JSON array of winter equipment types
+  purchaseDate           DateTime?
+  winterSeasonStart      DateTime?
+  winterSeasonEnd        DateTime?
+  baseDepartment         String?                            // Which department/depot the vehicle belongs to
+  isActive               Boolean                            @default(true)
+  notes                  String?
+  createdAt              DateTime                           @default(now())
+  updatedAt              DateTime                           @updatedAt
+  statusHistory          WinterVehicleStatusHistory[]
+  routeAssignments       WinterVehicleRouteAssignment[]
+  materialConsumption    WinterVehicleMaterialConsumption[]
+  dailyAssignments       WinterVehicleDailyAssignment[]
+}
+
+// Winter vehicle status tracking (separate from regular vehicle status)
+model WinterVehicleStatusHistory {
+  id                Int                      @id @default(autoincrement())
+  winterVehicleId   Int
+  date              DateTime
+  status            String                   // 'operational', 'out_of_service_vehicle', 'out_of_service_device', 'reconfigured', 'maintenance', 'standby'
+  equipmentType     String?                  // Currently mounted equipment: 'plow', 'salt_spreader', 'sweeper', etc.
+  notes             String?
+  reportedById      Int?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  winterVehicle     WinterVehicle            @relation(fields: [winterVehicleId], references: [id])
+  reportedBy        User?                    @relation("WinterStatusReporter", fields: [reportedById], references: [id])
+
+  @@unique([winterVehicleId, date])
+}
+
+// Winter vehicle route assignments (separate from regular route assignments)
+model WinterVehicleRouteAssignment {
+  id               Int            @id @default(autoincrement())
+  routeId          Int
+  winterVehicleId  Int
+  driverId         Int?
+  date             DateTime
+  startTime        String?        // HH:MM format
+  endTime          String?
+  status           String         @default("assigned") // 'assigned', 'in_progress', 'completed', 'cancelled'
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  route            WinterRoute    @relation(fields: [routeId], references: [id])
+  winterVehicle    WinterVehicle  @relation(fields: [winterVehicleId], references: [id])
+  driver           Employee?      @relation("WinterVehicleRouteDriver", fields: [driverId], references: [id])
+
+  @@unique([routeId, winterVehicleId, date])
+}
+
+// Winter vehicle material consumption (separate tracking)
+model WinterVehicleMaterialConsumption {
+  id               Int                   @id @default(autoincrement())
+  stockId          Int
+  date             DateTime
+  quantityUsed     Float
+  winterVehicleId  Int?
+  routeId          Int?
+  operatorId       Int?
+  weatherCondition String?              // 'snow', 'ice', 'sleet', 'clear'
+  temperature      Float?               // in Celsius
+  notes            String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  stock            WinterMaterialStock  @relation(fields: [stockId], references: [id])
+  winterVehicle    WinterVehicle?       @relation(fields: [winterVehicleId], references: [id])
+  route            WinterRoute?         @relation(fields: [routeId], references: [id])
+  operator         Employee?            @relation("WinterVehicleMaterialOperator", fields: [operatorId], references: [id])
+}
+
+// Winter vehicle daily assignments (separate from regular daily plans)
+model WinterVehicleDailyAssignment {
+  id               Int               @id @default(autoincrement())
+  planId           Int
+  winterVehicleId  Int
+  driverId         Int?
+  loaderId         Int?
+  regionId         Int?
+  routeId          Int?
+  assignmentType   String            // 'route', 'region', 'standby', 'emergency'
+  startTime        String?           // HH:MM format
+  endTime          String?
+  equipment        String?           // JSON array of equipment assigned
+  status           String            @default("assigned")
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  plan             WinterDailyPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  winterVehicle    WinterVehicle     @relation(fields: [winterVehicleId], references: [id])
+  driver           Employee?         @relation("WinterVehicleDailyDriver", fields: [driverId], references: [id])
+  loader           Employee?         @relation("WinterVehicleDailyLoader", fields: [loaderId], references: [id])
+  region           Region?           @relation(fields: [regionId], references: [id])
+  route            WinterRoute?      @relation(fields: [routeId], references: [id])
+
+  @@unique([planId, winterVehicleId])
+}
+
+// Vehicle status tracking for winter operations (LEGACY - kept for compatibility)
+model WinterVehicleStatus {
+  id                Int                      @id @default(autoincrement())
+  vehicleId         Int
+  date              DateTime
+  status            String                   // 'operational', 'out_of_service_vehicle', 'out_of_service_device', 'reconfigured'
+  equipmentType     String?                  // 'plow', 'salt_spreader', 'sweeper', etc.
+  notes             String?
+  reportedById      Int?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  vehicle           Vehicle                  @relation(fields: [vehicleId], references: [id])
+  reportedBy        User?                    @relation("WinterStatusReporter", fields: [reportedById], references: [id])
+
+  @@unique([vehicleId, date])
+}
+
+// Winter route plans with detailed instructions
+model WinterRoute {
+  id              Int                   @id @default(autoincrement())
+  name            String
+  description     String?
+  regionId        Int?
+  priority        String                @default("normal") // 'high', 'normal', 'low'
+  estimatedTime   Int?                  // in minutes
+  distance        Float?                // in kilometers
+  mapData         Json?                 // GeoJSON or coordinates
+  isActive        Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  region          Region?               @relation(fields: [regionId], references: [id])
+  routeSteps      WinterRouteStep[]
+  routeAssignments WinterRouteAssignment[]
+  materialConsumptions WinterMaterialConsumption[]
+  dailyPlanAssignments WinterDailyPlanAssignment[]
+  // New winter vehicle relations
+  winterVehicleRouteAssignments WinterVehicleRouteAssignment[]
+  winterVehicleMaterialConsumptions WinterVehicleMaterialConsumption[]
+  winterVehicleDailyAssignments WinterVehicleDailyAssignment[]
+}
+
+// Detailed step-by-step route instructions
+model WinterRouteStep {
+  id            Int          @id @default(autoincrement())
+  routeId       Int
+  stepOrder     Int
+  streetName    String
+  instruction   String
+  coordinates   Json?        // lat/lng for mapping
+  estimatedTime Int?         // in minutes for this step
+  route         WinterRoute  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, stepOrder])
+}
+
+// Route assignments to vehicles and drivers
+model WinterRouteAssignment {
+  id         Int          @id @default(autoincrement())
+  routeId    Int
+  vehicleId  Int
+  driverId   Int?
+  date       DateTime
+  startTime  String?      // HH:MM format
+  endTime    String?
+  status     String       @default("assigned") // 'assigned', 'in_progress', 'completed', 'cancelled'
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  route      WinterRoute  @relation(fields: [routeId], references: [id])
+  vehicle    Vehicle      @relation(fields: [vehicleId], references: [id])
+  driver     Employee?    @relation("WinterRouteDriver", fields: [driverId], references: [id])
+
+  @@unique([routeId, vehicleId, date])
+}
+
+// Sidewalk clearing management
+model WinterSidewalk {
+  id              Int                    @id @default(autoincrement())
+  name            String
+  startAddress    String
+  endAddress      String
+  length          Float?                 // in meters
+  regionId        Int?
+  priority        String                 @default("normal")
+  notes           String?
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  region          Region?                @relation(fields: [regionId], references: [id])
+  assignments     WinterSidewalkAssignment[]
+}
+
+// Sidewalk clearing assignments
+model WinterSidewalkAssignment {
+  id             Int              @id @default(autoincrement())
+  sidewalkId     Int
+  employeeId     Int
+  date           DateTime
+  shift          String           // 'day', 'night'
+  status         String           @default("assigned") // 'assigned', 'in_progress', 'completed'
+  completedAt    DateTime?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  sidewalk       WinterSidewalk   @relation(fields: [sidewalkId], references: [id])
+  employee       Employee         @relation("WinterSidewalkWorker", fields: [employeeId], references: [id])
+
+  @@unique([sidewalkId, employeeId, date])
+}
+
+// Bus stops and street bins for winter maintenance
+model WinterBusStop {
+  id              Int                      @id @default(autoincrement())
+  name            String
+  address         String
+  type            String                   // 'bus_stop', 'street_bin', 'both'
+  coordinates     Json?                    // lat/lng
+  regionId        Int?
+  priority        String                   @default("normal")
+  notes           String?
+  isActive        Boolean                  @default(true)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  region          Region?                  @relation(fields: [regionId], references: [id])
+  assignments     WinterBusStopAssignment[]
+}
+
+// Bus stop maintenance assignments
+model WinterBusStopAssignment {
+  id           Int             @id @default(autoincrement())
+  busStopId    Int
+  employeeId   Int
+  date         DateTime
+  shift        String          // 'day', 'night'
+  status       String          @default("assigned")
+  completedAt  DateTime?
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  busStop      WinterBusStop   @relation(fields: [busStopId], references: [id])
+  employee     Employee        @relation("WinterBusStopWorker", fields: [employeeId], references: [id])
+
+  @@unique([busStopId, employeeId, date])
+}
+
+// Road inventory management
+model WinterRoadInventory {
+  id            Int      @id @default(autoincrement())
+  name          String
+  roadNumber    String?
+  category      String   // 'national', 'regional', 'county', 'municipal'
+  startPoint    String
+  endPoint      String
+  length        Float    // in kilometers
+  width         Float?   // in meters
+  priority      String   @default("normal")
+  regionId      Int?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  region        Region?  @relation(fields: [regionId], references: [id])
+}
+
+// Salt and sand consumption tracking
+model WinterMaterialStock {
+  id              Int                         @id @default(autoincrement())
+  materialType    String                      // 'salt', 'sand', 'brine'
+  quantity        Float                       // in tons or liters
+  unit            String                      // 'tons', 'liters', 'kg'
+  location        String                      // storage location/depot
+  supplierName    String?
+  deliveryDate    DateTime?
+  expirationDate  DateTime?
+  cost            Float?
+  notes           String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  consumptions    WinterMaterialConsumption[]
+  // New winter vehicle relations
+  winterVehicleConsumptions WinterVehicleMaterialConsumption[]
+}
+
+// Material consumption tracking
+model WinterMaterialConsumption {
+  id               Int                   @id @default(autoincrement())
+  stockId          Int
+  date             DateTime
+  quantityUsed     Float
+  vehicleId        Int?
+  routeId          Int?
+  operatorId       Int?
+  weatherCondition String?              // 'snow', 'ice', 'sleet', 'clear'
+  temperature      Float?               // in Celsius
+  notes            String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  stock            WinterMaterialStock  @relation(fields: [stockId], references: [id])
+  vehicle          Vehicle?             @relation(fields: [vehicleId], references: [id])
+  route            WinterRoute?         @relation(fields: [routeId], references: [id])
+  operator         Employee?            @relation("WinterMaterialOperator", fields: [operatorId], references: [id])
+}
+
+// Daily operational planning (AZ Static Lists)
+model WinterDailyPlan {
+  id               Int                        @id @default(autoincrement())
+  date             DateTime
+  shift            String                     // 'day', 'night', 'emergency'
+  weatherForecast  String?
+  temperature      Float?
+  precipitation    String?                    // 'none', 'snow', 'rain', 'sleet'
+  priority         String                     @default("normal")
+  status           String                     @default("draft") // 'draft', 'active', 'completed', 'cancelled'
+  notes            String?
+  supervisorId     Int?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  supervisor       Employee?                  @relation("WinterPlanSupervisor", fields: [supervisorId], references: [id])
+  assignments      WinterDailyPlanAssignment[]
+  // New winter vehicle relations
+  winterVehicleAssignments WinterVehicleDailyAssignment[]
+}
+
+// Individual assignments within daily plans
+model WinterDailyPlanAssignment {
+  id             Int               @id @default(autoincrement())
+  planId         Int
+  vehicleId      Int
+  driverId       Int?
+  loaderId       Int?
+  regionId       Int?
+  routeId        Int?
+  assignmentType String            // 'route', 'region', 'standby', 'emergency'
+  startTime      String?           // HH:MM format
+  endTime        String?
+  equipment      Json?             // array of equipment assigned
+  status         String            @default("assigned")
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  plan           WinterDailyPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id])
+  driver         Employee?         @relation("WinterDailyDriver", fields: [driverId], references: [id])
+  loader         Employee?         @relation("WinterDailyLoader", fields: [loaderId], references: [id])
+  region         Region?           @relation(fields: [regionId], references: [id])
+  route          WinterRoute?      @relation(fields: [routeId], references: [id])
+
+  @@unique([planId, vehicleId])
+}

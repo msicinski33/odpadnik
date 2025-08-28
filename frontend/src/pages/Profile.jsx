@@ -2,8 +2,8 @@ import React, { useContext, useState, useRef } from 'react';
 import { UserContext } from '../UserContext';
 import authFetch from '../utils/authFetch';
 
-const API_URL = 'http://localhost:3000/api/users/me';
-const AVATAR_URL = 'http://localhost:3000';
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://192.168.1.7:3000'}/api/users/me`;
+const AVATAR_URL = process.env.REACT_APP_API_URL || 'http://192.168.1.7:3000';
 
 const Profile = () => {
   const { user, setUser } = useContext(UserContext);
@@ -69,10 +69,8 @@ const Profile = () => {
     const formData = new FormData();
     formData.append('avatar', file);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/avatar`, {
+      const res = await authFetch(`${API_URL}/avatar`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
       const data = await res.json();

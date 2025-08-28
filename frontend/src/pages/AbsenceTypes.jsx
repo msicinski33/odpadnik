@@ -5,8 +5,9 @@ import { Palette } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardHeader, CardContent } from '../components/ui/card';
 import { Edit2, Trash2 } from 'lucide-react';
+import authFetch from '../utils/authFetch';
 
-const API_URL = 'http://localhost:3000/api/absence-types';
+const API_URL = '/api/absence-types';
 
 const emptyForm = { name: '', code: '', color: '', notes: '' };
 
@@ -19,10 +20,19 @@ const AbsenceTypes = () => {
 
   const fetchTypes = async () => {
     setLoading(true);
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    setTypes(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const res = await authFetch(API_URL);
+      if (!res.ok) {
+        throw new Error('Failed to fetch absence types');
+      }
+      const data = await res.json();
+      setTypes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching absence types:', error);
+      setTypes([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchTypes(); }, []);
@@ -34,21 +44,36 @@ const AbsenceTypes = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Usunąć ten rodzaj absencji?')) return;
-    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-    fetchTypes();
+    try {
+      const res = await authFetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchTypes();
+      } else {
+        console.error('Failed to delete absence type');
+      }
+    } catch (error) {
+      console.error('Error deleting absence type:', error);
+    }
   };
 
   const handleSubmit = async (form) => {
     const method = editing ? 'PUT' : 'POST';
     const url = editing ? `${API_URL}/${editing.id}` : API_URL;
-    await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    setModalOpen(false);
-    setEditing(null);
-    fetchTypes();
+    try {
+      const res = await authFetch(url, {
+        method,
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setModalOpen(false);
+        setEditing(null);
+        fetchTypes();
+      } else {
+        console.error('Failed to save absence type');
+      }
+    } catch (error) {
+      console.error('Error saving absence type:', error);
+    }
   };
 
   const filteredTypes = types.filter(type =>

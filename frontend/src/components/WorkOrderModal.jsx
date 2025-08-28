@@ -25,42 +25,42 @@ const WorkOrderModal = ({ open, onClose, onSave, initial, orderType }) => {
 
   useEffect(() => {
     if (orderType === 'surowce' && open) {
-      authFetch('http://localhost:3000/api/employees')
+      authFetch('/api/employees')
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.position && e.position.toLowerCase().includes('kierowca')) : []));
-      authFetch('http://localhost:3000/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.vehicleType && v.vehicleType.toLowerCase().includes('wywrotka')) : []));
     }
     if (orderType === 'worki' && open) {
-      authFetch('http://localhost:3000/api/employees')
+      authFetch('/api/employees')
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.position && e.position.toLowerCase().includes('kierowca')) : []));
-      authFetch('http://localhost:3000/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.vehicleType && (v.vehicleType.toLowerCase().includes('wywrotka') || v.vehicleType.toLowerCase().includes('ciągnik'))) : []));
     }
     if (orderType === 'uslugi' && open) {
-      authFetch('http://localhost:3000/api/employees')
+      authFetch('/api/employees')
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.position && e.position.toLowerCase().includes('kierowca')) : []));
-      authFetch('http://localhost:3000/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.vehicleType && (v.vehicleType.toLowerCase().includes('hakowy') || v.vehicleType.toLowerCase().includes('bramowy'))) : []));
     }
     if (orderType === 'bramy' && open) {
-      authFetch('http://localhost:3000/api/employees')
+      authFetch('/api/employees')
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.position && e.position.toLowerCase().includes('kierowca')) : []));
-      authFetch('http://localhost:3000/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.vehicleType && v.vehicleType.toLowerCase().includes('bramowy')) : []));
     }
     if (orderType === 'bezpylne' && open) {
-      authFetch('http://localhost:3000/api/employees')
+      authFetch('/api/employees')
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.position && e.position.toLowerCase().includes('kierowca')) : []));
-      authFetch('http://localhost:3000/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.vehicleType && (v.vehicleType.toLowerCase().includes('bezpylny') || v.vehicleType.toLowerCase().includes('dostawczy'))) : []));
     }

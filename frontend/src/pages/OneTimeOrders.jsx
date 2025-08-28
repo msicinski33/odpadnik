@@ -409,9 +409,8 @@ export default function OneTimeOrders() {
 
   // Download PDF
   async function handleDownloadPdf(order) {
-    const res = await fetch(`/api/one-time-orders/${order.id}/merged-pdf`, {
+    const res = await authFetch(`/api/one-time-orders/${order.id}/merged-pdf`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
     });
     if (!res.ok) {
       toast({ title: 'Błąd', description: 'Nie udało się pobrać PDF', variant: 'destructive' });
@@ -552,9 +551,8 @@ export default function OneTimeOrders() {
   // Generate PDF with all pending orders
   async function handleGeneratePendingPdf() {
     try {
-      const res = await fetch('/api/one-time-orders/pending-pdf', {
+      const res = await authFetch('/api/one-time-orders/pending-pdf', {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });
       
       if (!res.ok) {
@@ -593,6 +591,42 @@ export default function OneTimeOrders() {
         variant: "destructive",
       });
     }
+  }
+
+  // Download pending orders PDF
+  async function handleDownloadPendingPdf() {
+    const res = await authFetch('/api/one-time-orders/pending-pdf', {
+      method: 'GET',
+    });
+    if (!res.ok) {
+      toast({ title: 'Błąd', description: 'Nie udało się pobrać PDF', variant: 'destructive' });
+      return;
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zlecenia-oczekujace-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    }, 10000);
+  }
+
+  // View order details PDF
+  async function handleViewOrderDetailsPdf(order) {
+    const res = await authFetch(`/api/one-time-orders/${order.id}`, {
+      method: 'GET',
+    });
+    if (!res.ok) {
+      toast({ title: 'Błąd', description: 'Nie udało się pobrać szczegółów', variant: 'destructive' });
+      return;
+    }
+    const data = await res.json();
+    // Handle the PDF display logic here
+    console.log('Order details:', data);
   }
 
   const stats = calculateStats(orders);

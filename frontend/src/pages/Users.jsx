@@ -29,7 +29,7 @@ const Users = () => {
     // Load dynamic roles list for selector
     (async () => {
       try {
-        const res = await authFetch('http://localhost:3000/api/roles');
+        const res = await authFetch('/api/roles');
         if (res.ok) {
           const data = await res.json();
           setRoles(data);
@@ -40,7 +40,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await authFetch('http://localhost:3000/api/users');
+      const response = await authFetch('/api/users');
       const data = await response.json();
       setUsers(data);
     } catch (error) {
@@ -56,7 +56,7 @@ const Users = () => {
 
   const handleToggleActive = async (userId, currentStatus) => {
     try {
-      const response = await authFetch(`http://localhost:3000/api/users/${userId}`, {
+      const response = await authFetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
@@ -94,7 +94,7 @@ const Users = () => {
     }
 
     try {
-      const response = await authFetch(`http://localhost:3000/api/users/${userId}`, {
+      const response = await authFetch(`/api/users/${userId}`, {
         method: 'DELETE',
       });
       
@@ -144,7 +144,7 @@ const Users = () => {
     e.preventDefault();
     setCreating(true);
     try {
-      const response = await authFetch('http://localhost:3000/api/auth/register', {
+      const response = await authFetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),

@@ -24,13 +24,13 @@ const DailyPlanBezpylne = ({ date }) => {
   const [fractions, setFractions] = useState([]);
 
   useEffect(() => {
-    fetch('/api/municipalities')
+    authFetch('/api/municipalities')
       .then(res => res.json())
       .then(data => setMunicipalityOptions(Array.isArray(data) ? data : []));
   }, []);
 
   useEffect(() => {
-    fetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
+    authFetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
       .then(res => res.json())
       .then(data => {
         setAssignments(Array.isArray(data) ? data : []);
@@ -38,7 +38,7 @@ const DailyPlanBezpylne = ({ date }) => {
   }, [date, modalOpen]);
 
   useEffect(() => {
-    fetch(`/api/calendar/today`)
+    authFetch(`/api/calendar/today`)
       .then(res => res.json())
       .then(entries => {
         setCalendarEntries(entries);
@@ -55,24 +55,24 @@ const DailyPlanBezpylne = ({ date }) => {
   }, [date]);
 
   useEffect(() => {
-    authFetch('http://localhost:3000/api/regions')
+    authFetch('/api/regions')
       .then(res => res.json())
       .then(data => setRegions(Array.isArray(data) ? data : []));
-    authFetch('http://localhost:3000/api/fractions')
+    authFetch('/api/fractions')
       .then(res => res.json())
       .then(data => setFractions(Array.isArray(data) ? data : []));
   }, []);
 
   // Pobierz obecnych pracowników na dany dzień (z grafiku dziennego)
   useEffect(() => {
-    fetch(`/api/employees/schedule/by-date?date=${date}`)
+    authFetch(`/api/employees/schedule/by-date?date=${date}`)
       .then(res => res.json())
       .then(data => setEmployees(Array.isArray(data) ? data : []));
   }, [date]);
 
   // Pobierz pojazdy operational, typ bezpylny lub dostawczy
   useEffect(() => {
-    fetch('/api/vehicles')
+    authFetch('/api/vehicles')
       .then(res => res.json())
       .then(data => setVehicles(Array.isArray(data) ? data.filter(v => v.faultStatus === 'operational' && (v.vehicleType?.toLowerCase().includes('bezpylny') || v.vehicleType?.toLowerCase().includes('dostawczy'))) : []));
   }, []);
@@ -115,7 +115,7 @@ const DailyPlanBezpylne = ({ date }) => {
   const handleCellSave = async (value) => {
     if (activeField === 'kierowca' && value && value.id) {
       try {
-        const res = await fetch(`/api/employees/schedule/by-date?date=${date}`);
+        const res = await authFetch(`/api/employees/schedule/by-date?date=${date}`);
         const data = await res.json();
         const driver = data.find(e => String(e.id) === String(value.id));
         const shift = driver && driver.shift ? driver.shift : '6-14';
@@ -192,13 +192,13 @@ const DailyPlanBezpylne = ({ date }) => {
         ...(frakcjaObj && frakcjaObj.id ? { fractions: [{ fraction: frakcjaObj }] } : {}),
         type: 'bezpylne',
       };
-      await fetch(`/api/dailyAssignments/${editRowId}`, {
+      await authFetch(`/api/dailyAssignments/${editRowId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedAssignment),
       });
       // Po zapisie odśwież assignments z backendu
-      fetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
+      authFetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
         .then(res => res.json())
         .then(data => setAssignments(Array.isArray(data) ? data : []));
       setEditRowId(null);
@@ -219,7 +219,7 @@ const DailyPlanBezpylne = ({ date }) => {
         date: new Date(date).toISOString(),
         type: 'bezpylne',
       };
-      const res = await fetch('/api/dailyAssignments', {
+      const res = await authFetch('/api/dailyAssignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newAssignment),
@@ -230,7 +230,7 @@ const DailyPlanBezpylne = ({ date }) => {
         return;
       }
       // Po zapisie odśwież assignments z backendu
-      fetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
+      authFetch(`/api/dailyAssignments?date=${date}&type=bezpylne`)
         .then(res => res.json())
         .then(data => setAssignments(Array.isArray(data) ? data : []));
       setEmptyRows(rows => rows.filter(r => r.id !== rowId));
@@ -243,7 +243,7 @@ const DailyPlanBezpylne = ({ date }) => {
 
   const handleDelete = (assignment) => {
     if (!window.confirm('Czy na pewno chcesz usunąć ten przydział?')) return;
-    fetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' })
+    authFetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' })
       .then(res => {
         if (res.ok) {
           setAssignments(assignments => assignments.filter(a => a.id !== assignment.id));

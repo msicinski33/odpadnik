@@ -14,7 +14,7 @@ const PointList = ({ type, onEdit, onAdd, onDelete, onView }) => {
   const fetchPoints = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await authFetch(`http://localhost:3000/api/points/type/${type}`);
+      const res = await authFetch(`/api/points/type/${type}`);
       const data = await res.json();
       setPoints(data);
     } catch (err) {
@@ -31,7 +31,7 @@ const PointList = ({ type, onEdit, onAdd, onDelete, onView }) => {
   const handleDelete = async (id) => {
     if (window.confirm('Czy na pewno chcesz usunąć ten punkt?')) {
       try {
-        await authFetch(`http://localhost:3000/api/points/${id}`, { method: 'DELETE' });
+        await authFetch(`/api/points/${id}`, { method: 'DELETE' });
         fetchPoints();
       } catch (err) {
         setError('Błąd usuwania punktu: ' + err.message);

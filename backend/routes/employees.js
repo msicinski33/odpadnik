@@ -30,8 +30,7 @@ router.get('/', async (req, res) => {
             id: true,
             date: true,
             description: true,
-            estimatedCost: true,
-            supervisor: true
+            amount: true
           },
           orderBy: {
             date: 'desc'
@@ -73,9 +72,25 @@ router.post('/', async (req, res) => {
 // Update employee
 router.put('/:id', async (req, res) => {
   try {
+    // Extract relation fields that should not be included in direct update
+    const { damages, ...updateData } = req.body;
+    
     const employee = await prisma.employee.update({
       where: { id: Number(req.params.id) },
-      data: req.body,
+      data: updateData,
+      include: {
+        damages: {
+          select: {
+            id: true,
+            date: true,
+            description: true,
+            amount: true
+          },
+          orderBy: {
+            date: 'desc'
+          }
+        }
+      }
     });
     res.json(employee);
   } catch (error) {

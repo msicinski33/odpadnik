@@ -8,10 +8,12 @@ import { Input } from "../components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
-import { Calendar, Clock, Users, Save, Trash2, Plus, Info, FileText } from "lucide-react";
+import { Calendar, Clock, Users, Save, Trash2, Plus, Info, FileText, Edit } from "lucide-react";
 import { pl } from "date-fns/locale";
 import { toast } from "sonner";
 import { UserContext } from "../UserContext";
+import { hasPermission } from "../lib/utils";
+import ScheduleChangeRequestModal from "../components/ScheduleChangeRequestModal";
 
   const shifts = [
   { id: "6-14", label: "Zmiana poranna", time: "6:00 - 14:00", color: "bg-blue-100 text-blue-800 border-blue-200" },
@@ -68,6 +70,17 @@ export default function MonthlySchedule(props) {
   const [mismatchedEmployees, setMismatchedEmployees] = useState([]);
   const [pendingSave, setPendingSave] = useState(false);
   const [nightShiftViolations, setNightShiftViolations] = useState([]);
+  
+  // Schedule change request states
+  const [showScheduleChangeModal, setShowScheduleChangeModal] = useState(false);
+  const [scheduleChangeRequest, setScheduleChangeRequest] = useState({
+    employeeId: null,
+    date: null,
+    currentShift: null,
+    changeType: 'SHIFT_CHANGE'
+  });
+  
+  const canRequestScheduleChanges = hasPermission(user, 'scheduleChanges:create');
 
   // Helpers to determine working shifts and calculate employee hours
   function isCustomTimeShift(shift) {
@@ -367,6 +380,55 @@ export default function MonthlySchedule(props) {
       return;
     }
     updateShift(emp.id, dateStr, selectedLegendShift);
+  };
+  
+  // Handle schedule change request
+  const handleScheduleChangeRequest = (employee, date, currentShift) => {
+    if (!canRequestScheduleChanges) {
+      toast.error('Brak uprawnień do składania wniosków o zmiany grafiku');
+      return;
+    }
+    
+    setScheduleChangeRequest({
+      employeeId: employee.id,
+      date: format(date, 'yyyy-MM-dd'),
+      currentShift: currentShift || '',
+      changeType: currentShift ? 'SHIFT_CHANGE' : 'SHIFT_REMOVAL'
+    });
+    setShowScheduleChangeModal(true);
+  };
+  
+  // Submit schedule change request
+  const submitScheduleChangeRequest = async (requestData) => {
+    try {
+      const response = await authFetch('/api/schedule-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: scheduleChangeRequest.employeeId,
+          changeType: requestData.changeType,
+          startDate: scheduleChangeRequest.date,
+          endDate: scheduleChangeRequest.date,
+          originalShift: scheduleChangeRequest.currentShift,
+          newShift: requestData.newShift,
+          absenceTypeId: requestData.absenceTypeId,
+          reason: requestData.reason,
+          description: requestData.description
+        })
+      });
+      
+      if (response.ok) {
+        toast.success('Wniosek o zmianę grafiku został złożony');
+        setShowScheduleChangeModal(false);
+        setScheduleChangeRequest({ employeeId: null, date: null, currentShift: null, changeType: 'SHIFT_CHANGE' });
+      } else {
+        const error = await response.json();
+        toast.error(`Błąd: ${error.error || 'Nie udało się złożyć wniosku'}`);
+      }
+    } catch (error) {
+      console.error('Error submitting schedule change request:', error);
+      toast.error('Błąd podczas składania wniosku');
+    }
   };
 
   const handleCellMouseDown = (empId, dayIdx) => {
@@ -791,10 +853,30 @@ export default function MonthlySchedule(props) {
                               onMouseDown={() => handleCellMouseDown(emp.id, i)}
                               onMouseEnter={() => handleCellMouseEnter(emp.id, i)}
                               onMouseUp={handleCellMouseUp}
-                              title={`${format(day, "EEEE, MMMM d", { locale: pl })} - Kliknij, aby przypisać zmianę`}
+                              onContextMenu={(e) => {
+                                if (canRequestScheduleChanges) {
+                                  e.preventDefault();
+                                  handleScheduleChangeRequest(emp, day, shift);
+                                }
+                              }}
+                              title={`${format(day, "EEEE, MMMM d", { locale: pl })} - Kliknij, aby przypisać zmianę${canRequestScheduleChanges ? ' | Prawy klik, aby złożyć wniosek o zmianę' : ''}`}
                               style={{ userSelect: 'none' }}
                             >
-                              {shift && getShiftBadge(shift)}
+                              <div className="flex items-center justify-center gap-1">
+                                {shift && getShiftBadge(shift)}
+                                {canRequestScheduleChanges && (
+                                  <button
+                                    className="opacity-0 hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-blue-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleScheduleChangeRequest(emp, day, shift);
+                                    }}
+                                    title="Złóż wniosek o zmianę"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           );
                         })}
@@ -937,6 +1019,15 @@ export default function MonthlySchedule(props) {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Schedule Change Request Modal */}
+        <ScheduleChangeRequestModal
+          isOpen={showScheduleChangeModal}
+          onClose={() => setShowScheduleChangeModal(false)}
+          onSubmit={submitScheduleChangeRequest}
+          scheduleChangeRequest={scheduleChangeRequest}
+          employees={employees}
+        />
       </div>
     </div>
   );

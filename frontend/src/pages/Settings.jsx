@@ -18,7 +18,7 @@ const Settings = () => {
     setMessage('');
     setError('');
     try {
-      const res = await authFetch('http://localhost:3000/api/users', {
+      const res = await authFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -34,7 +34,7 @@ const Settings = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await authFetch('http://localhost:3000/api/roles');
+        const res = await authFetch('/api/roles');
         if (!res.ok) return;
         const data = await res.json();
         setRoles(data);

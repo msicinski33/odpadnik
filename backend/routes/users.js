@@ -7,30 +7,27 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-// Multer setup for avatar uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads/avatars'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `user_${req.user.id}${ext}`);
-  },
-});
-const upload = multer({ storage });
-
 // Get current user profile (with effective permissions)
 router.get('/me', authenticateToken, attachPermissions, async (req, res) => {
   try {
+    console.log(`[USERS] /me endpoint called for user ${req.user.id}`);
+    
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: { id: true, name: true, email: true, role: true, avatarUrl: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    // attach effective permissions if resolved by middleware
-    const permissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    
+    console.log(`[USERS] User found: ${user.name} with role: ${user.role}`);
+    
+    // Use permissions already attached by the middleware (much faster)
+    const permissions = req.user.permissions || [];
+    console.log(`[USERS] Using permissions from middleware: ${permissions.length} permissions`);
+    
+    console.log(`[USERS] Sending response for user ${user.id}`);
     res.json({ ...user, permissions });
   } catch (error) {
+    console.error(`[USERS] Error in /me endpoint:`, error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -51,7 +48,22 @@ router.put('/me', authenticateToken, async (req, res) => {
 });
 
 // Avatar upload endpoint
-router.post('/me/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
+router.post('/me/avatar', authenticateToken, (req, res, next) => {
+  // Configure multer storage inside the route handler where req.user is available
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, path.join(__dirname, '../uploads/avatars'));
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `user_${req.user.id}${ext}`);
+    },
+  });
+  const upload = multer({ storage });
+  
+  // Use the upload middleware
+  upload.single('avatar')(req, res, next);
+}, async (req, res) => {
   try {
     const avatarUrl = `/uploads/avatars/${req.file.filename}`;
     const user = await prisma.user.update({

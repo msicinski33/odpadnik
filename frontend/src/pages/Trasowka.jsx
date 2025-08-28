@@ -15,7 +15,7 @@ const Trasowka = () => {
   const { data: regions = [], isLoading: loadingRegions } = useQuery({
     queryKey: ['regions'],
     queryFn: async () => {
-      const res = await authFetch('http://localhost:3000/api/regions');
+      const res = await authFetch('/api/regions');
       if (!res.ok) throw new Error('Błąd pobierania regionów');
       return res.json();
     },
@@ -26,7 +26,7 @@ const Trasowka = () => {
     queryKey: ['points', selectedRegion?.id],
     queryFn: async () => {
       if (!selectedRegion) return [];
-      const res = await authFetch(`http://localhost:3000/api/points?regionId=${selectedRegion.id}&type=zamieszkala`);
+      const res = await authFetch(`/api/points?regionId=${selectedRegion.id}&type=zamieszkala`);
       if (!res.ok) throw new Error('Błąd pobierania punktów');
       return res.json();
     },
@@ -40,7 +40,7 @@ const Trasowka = () => {
   const { data: fractions = [], isLoading: loadingFractions } = useQuery({
     queryKey: ['fractions'],
     queryFn: async () => {
-      const res = await authFetch('http://localhost:3000/api/fractions');
+      const res = await authFetch('/api/fractions');
       if (!res.ok) throw new Error('Błąd pobierania frakcji');
       return res.json();
     },
@@ -64,7 +64,7 @@ const Trasowka = () => {
     }
 
     try {
-      const response = await authFetch('http://localhost:3000/api/trasowka/generate', {
+      const response = await authFetch('/api/trasowka/generate', {
         method: 'POST',
         body: JSON.stringify({
           regionId: selectedRegion.id,

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SimpleModal from './SimpleModal';
 import { Button } from './ui/button';
 import socket from '../lib/socket';
+import authFetch from '../utils/authFetch';
 
 const AssignmentModal = ({ open, onClose, onSave, initial, orderType, date, type, regionOptions = [], getFractionsForRegion, activeField, availableFractions, municipalityOptions, employees: employeesProp, vehicles: vehiclesProp }) => {
   const [employees, setEmployees] = useState([]);
@@ -34,18 +35,18 @@ const AssignmentModal = ({ open, onClose, onSave, initial, orderType, date, type
     if (Array.isArray(employeesProp) && employeesProp.length > 0) {
       setEmployees(employeesProp);
     } else if (date) {
-      fetch(`/api/employees/schedule/by-date?date=${date}`)
+      authFetch(`/api/employees/schedule/by-date?date=${date}`)
         .then(res => res.json())
         .then(data => setEmployees(Array.isArray(data) ? data : []));
     }
     if (Array.isArray(vehiclesProp) && vehiclesProp.length > 0) {
       setVehicles(vehiclesProp);
     } else {
-      fetch('/api/vehicles')
+      authFetch('/api/vehicles')
         .then(res => res.json())
         .then(data => setVehicles(Array.isArray(data) ? data : []));
     }
-    fetch(`/api/dailyAssignments/locks?date=${date}`)
+    authFetch(`/api/dailyAssignments/locks?date=${date}`)
       .then(res => res.json())
       .then(data => setLocks({
         employees: Array.from(data.employees || []),
@@ -82,14 +83,14 @@ const AssignmentModal = ({ open, onClose, onSave, initial, orderType, date, type
   // Reserve resources on open, release on close
   useEffect(() => {
     if (open && responsible && date && type) {
-      fetch('/api/dailyAssignments/reserve-resource', {
+      authFetch('/api/dailyAssignments/reserve-resource', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, type, resourceType: 'employees', id: responsible })
       });
     }
     if (open && vehicle && date && type) {
-      fetch('/api/dailyAssignments/reserve-resource', {
+      authFetch('/api/dailyAssignments/reserve-resource', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, type, resourceType: 'vehicles', id: vehicle })
@@ -97,14 +98,14 @@ const AssignmentModal = ({ open, onClose, onSave, initial, orderType, date, type
     }
     return () => {
       if (responsible && date && type) {
-        fetch('/api/dailyAssignments/release-resource', {
+        authFetch('/api/dailyAssignments/release-resource', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date, type, resourceType: 'employees', id: responsible })
         });
       }
       if (vehicle && date && type) {
-        fetch('/api/dailyAssignments/release-resource', {
+        authFetch('/api/dailyAssignments/release-resource', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date, type, resourceType: 'vehicles', id: vehicle })

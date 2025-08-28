@@ -9,7 +9,7 @@ import authFetch from '../utils/authFetch';
 import DataPageHeader from '../components/ui/DataPageHeader';
 import { Button } from '../components/ui/button';
 
-const API_URL = 'http://localhost:3000/api/fractions';
+const API_URL = '/api/fractions';
 
 const fetchFractions = async () => {
   const res = await authFetch(API_URL);

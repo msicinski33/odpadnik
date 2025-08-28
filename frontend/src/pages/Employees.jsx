@@ -8,7 +8,7 @@ import { Users } from 'lucide-react';
 import DataPageHeader from '../components/ui/DataPageHeader';
 import { Button } from '../components/ui/button';
 
-const API_URL = 'http://localhost:3000/api/employees';
+const API_URL = '/api/employees';
 
 const fetchEmployees = async () => {
   const res = await authFetch(API_URL);

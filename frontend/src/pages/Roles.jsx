@@ -5,7 +5,9 @@ import { UserContext } from '../UserContext';
 const MODULES = [
   'employees', 'vehicles', 'regions', 'points', 'fractions', 'calendar', 'dailyAssignments', 'workorders', 'oneTimeOrders', 'debrisBagOrders', 'damages',
   // New RBAC modules for restricted areas
-  'monthlyPlan', 'workCard', 'trasowka'
+  'monthlyPlan', 'workCard', 'trasowka', 'leavePlanning', 'containers', 'scheduleChanges',
+  // Winter Action modules
+  'winterAction', 'winterVehicles', 'winterVehicleStatus', 'winterRoutes', 'winterDailyPlan', 'winterMaterials', 'winterSidewalks', 'winterBusStops', 'winterRoadInventory'
 ];
 const ACTIONS = ['read', 'create', 'update', 'delete'];
 
@@ -20,7 +22,7 @@ export default function RolesPage() {
   const [message, setMessage] = useState('');
 
   const loadRoles = async () => {
-    const res = await authFetch('http://localhost:3000/api/roles');
+    const res = await authFetch('/api/roles');
     if (!res.ok) return;
     const data = await res.json();
     setRoles(data);
@@ -56,13 +58,13 @@ export default function RolesPage() {
     try {
       if (!name.trim()) throw new Error('Role name required');
       if (selectedRole) {
-        const res = await authFetch(`http://localhost:3000/api/roles/${selectedRole.id}`, {
+        const res = await authFetch(`/api/roles/${selectedRole.id}`, {
           method: 'PUT',
           body: JSON.stringify({ name, description })
         });
         if (!res.ok) throw new Error('Failed to update role');
       } else {
-        const res = await authFetch('http://localhost:3000/api/roles', {
+        const res = await authFetch('/api/roles', {
           method: 'POST',
           body: JSON.stringify({ name, description })
         });
@@ -70,8 +72,8 @@ export default function RolesPage() {
       }
       // Save permissions
       const perms = Array.from(permissions).map(k => ({ module: k.split(':')[0], action: k.split(':')[1] }));
-      const roleId = selectedRole ? selectedRole.id : (await (await authFetch('http://localhost:3000/api/roles')).json()).find(r => r.name === name)?.id;
-      const resPerm = await authFetch(`http://localhost:3000/api/roles/${roleId}/permissions`, {
+      const roleId = selectedRole ? selectedRole.id : (await (await authFetch('/api/roles')).json()).find(r => r.name === name)?.id;
+      const resPerm = await authFetch(`/api/roles/${roleId}/permissions`, {
         method: 'PUT',
         body: JSON.stringify({ permissions: perms })
       });

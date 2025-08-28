@@ -21,7 +21,7 @@ const PointForm = ({ initialData, onSubmit, onCancel }) => {
 
   useEffect(() => {
     const fetchRegions = async () => {
-      const res = await authFetch('http://localhost:3000/api/regions');
+      const res = await authFetch('/api/regions');
       setRegions(await res.json());
     };
     fetchRegions();

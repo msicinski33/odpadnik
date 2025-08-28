@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatedTruck } from '../components/AnimatedTruck';
 import { Building } from 'lucide-react';
 
-const API_URL = 'http://localhost:3000/api/auth/login';
+const API_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api/auth/login` : 'http://192.168.1.7:3000/api/auth/login';
 
 const Login = ({ onLogin }) => {
   const navigate = useNavigate();
@@ -26,21 +26,26 @@ const Login = ({ onLogin }) => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
+      
       localStorage.setItem('token', data.token);
-      // Immediately fetch full profile with permissions so sidebar renders correctly without manual reload
+      
+      // Fetch user permissions immediately after login
       try {
-        const meRes = await fetch('http://localhost:3000/api/users/me', {
-          headers: { Authorization: `Bearer ${data.token}` },
+        const userRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://192.168.1.7:3000'}/api/users/me`, {
+          headers: { 'Authorization': `Bearer ${data.token}` }
         });
-        if (meRes.ok) {
-          const me = await meRes.json();
-          if (onLogin) onLogin(me);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          if (onLogin) onLogin(userData); // Pass complete user data with permissions
         } else {
+          // Fallback to basic user data if permissions fetch fails
           if (onLogin) onLogin(data.user);
         }
-      } catch {
+      } catch (permError) {
+        console.warn('Failed to fetch permissions, using basic user data:', permError);
         if (onLogin) onLogin(data.user);
       }
+      
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);
@@ -59,13 +64,21 @@ const Login = ({ onLogin }) => {
       <div className="w-full max-w-md relative z-10">
         <div className="bg-white rounded-2xl shadow-xl p-8 animate-fade-in backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+            <div className="flex items-center justify-center">
+              <img 
+                src="/odpadnik.png" 
+                alt="ODPADNIK Logo" 
+                className="w-80 h-48 object-contain"
+                onError={(e) => {
+                  // Fallback to original icon if logo fails to load
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center hidden">
                 <Building className="h-6 w-6 text-white" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">ODPADnik</h1>
-            <p className="text-gray-600">System zarządzania odpadami</p>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">

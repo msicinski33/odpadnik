@@ -7,6 +7,7 @@ import SimpleModal from '../components/SimpleModal'; // Added import for SimpleM
 import ReactMarkdown from 'react-markdown';
 import DailyPlanBezpylne from './DailyPlanBezpylne';
 import DailyPlanSprzatanie from './DailyPlanSprzatanie';
+import authFetch from '../utils/authFetch';
 
 const PLAN_TYPES = [
   { key: 'bezpylne', label: 'Bezpylne' },
@@ -50,14 +51,14 @@ const DailyPlan = () => {
 
   // Fetch municipalities
   useEffect(() => {
-    fetch('/api/municipalities')
+    authFetch('/api/municipalities')
       .then(res => res.json())
       .then(data => setMunicipalityOptions(Array.isArray(data) ? data : []));
   }, []);
 
   // Fetch assignments for selected date and type
   useEffect(() => {
-    fetch(`/api/dailyAssignments?date=${date}&type=${type}`)
+    authFetch(`/api/dailyAssignments?date=${date}&type=${type}`)
       .then(res => res.json())
       .then(data => {
         setAssignments(Array.isArray(data) ? data : []);
@@ -67,7 +68,7 @@ const DailyPlan = () => {
   // Fetch waste calendar for the selected date (for bezpylne)
   useEffect(() => {
     if (type !== 'bezpylne') return;
-    fetch(`/api/calendar/today`)
+    authFetch(`/api/calendar/today`)
       .then(res => res.json())
       .then(entries => {
         setCalendarEntries(entries);
@@ -140,7 +141,7 @@ const DailyPlan = () => {
     if (activeField === 'kierowca' && value && value.id) {
       // Fetch the schedule for the selected date
       try {
-        const res = await fetch(`/api/employees/schedule/by-date?date=${date}`);
+        const res = await authFetch(`/api/employees/schedule/by-date?date=${date}`);
         const data = await res.json();
         // Find the selected driver's shift
         const driver = data.find(e => String(e.id) === String(value.id));
@@ -148,7 +149,8 @@ const DailyPlan = () => {
         setEmptyRows(rows => rows.map(row =>
           row.id === activeRowId ? { ...row, kierowca: value, shift } : row
         ));
-      } catch (e) {
+      } catch (error) {
+        console.error('Error fetching driver schedule:', error);
         setEmptyRows(rows => rows.map(row =>
           row.id === activeRowId ? { ...row, kierowca: value, shift: '6-14' } : row
         ));
@@ -198,81 +200,59 @@ const DailyPlan = () => {
     setModalOpen(false);
   };
 
-  const handleSave = async (value, rowId) => {
-    console.log('handleSave called', value); // DEBUG LOG
-    if (editRowId) {
-      // Edit existing assignment
-      const assignmentType = value.type || type;
-      const updatedAssignment = {
-        ...assignments.find(a => a.id === editRowId),
-        shift: value.shift,
-        driver: value.kierowca || value.driver,
-        assistants: value.ladowacze ? value.ladowacze.map(l => ({ employee: l })) : [],
-        vehicle: value.pojazd || value.vehicle,
-        region: value.rejon || value.region,
-        municipality: value.gmina || value.municipality,
-        ...(assignmentType === 'bezpylne' && value.frakcja ? { fractions: [{ fraction: value.frakcja }] } : {}),
-        type: assignmentType,
-      };
-      // Remove fractions for non-bezpylne types (PUT)
-      if (assignmentType !== 'bezpylne' && updatedAssignment.fractions) {
-        delete updatedAssignment.fractions;
-      }
-      await fetch(`/api/dailyAssignments/${editRowId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedAssignment),
-      });
-      setAssignments(assignments => assignments.map(a => a.id === editRowId ? updatedAssignment : a));
-      setEditRowId(null);
-      setModalOpen(false);
-      setEditingAssignment(null);
+  const handleSaveAll = async () => {
+    const validRows = emptyRows.filter(row => 
+      row.kierowca && row.pojazd && row.rejon && row.gmina && row.frakcja
+    );
+
+    if (validRows.length === 0) {
+      alert('Proszę wypełnić wszystkie wymagane pola');
       return;
     }
-    if (rowId) {
-      // Add new assignment
-      const assignmentType = value.type || type;
-      const newAssignment = {
-        id: uuidv4(),
-        shift: value.shift,
-        driver: value.kierowca || value.driver,
-        assistants: value.ladowacze ? value.ladowacze.map(l => ({ employee: l })) : [],
-        vehicle: value.pojazd || value.vehicle,
-        region: value.rejon || value.region,
-        municipalityId: value.gmina?.id || value.municipality?.id,
-        ...(assignmentType === 'bezpylne' && value.frakcja ? { fractions: [{ fraction: value.frakcja }] } : {}),
-        date: new Date(date).toISOString(),
-        type: assignmentType,
-      };
-      const res = await fetch('/api/dailyAssignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAssignment),
+
+    try {
+      const promises = validRows.map(row => {
+        const assignment = {
+          date,
+          type,
+          responsible: row.kierowca.id,
+          vehicle: row.pojazd.id,
+          assistants: row.ladowacze.map(l => l.id),
+          regionId: row.rejon.id,
+          regionName: row.rejon.name,
+          municipality: row.gmina,
+          fractionIds: [row.frakcja.id],
+          fractionName: row.frakcja.name,
+          shift: row.shift,
+        };
+
+        return authFetch('/api/dailyAssignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(assignment),
+        });
       });
-      if (!res.ok) {
-        const err = await res.json();
-        alert('Błąd zapisu: ' + (err.error || 'Nieznany błąd'));
-        return;
-      }
-      const saved = await res.json();
-      setAssignments(assignments => [...assignments, saved]);
-      setEmptyRows(rows => rows.filter(r => r.id !== rowId));
-      setActiveRowId(null);
-      setModalOpen(false);
-      return;
+
+      await Promise.all(promises);
+      setEmptyRows([]);
+      setAssignments(prev => [...prev, ...validRows]);
+      alert('Wszystkie zadania zostały zapisane');
+    } catch (error) {
+      console.error('Error saving assignments:', error);
+      alert('Błąd podczas zapisywania zadań');
     }
-    // fallback for cell edit
-    handleCellSave(value);
   };
 
-  const handleDelete = (assignment) => {
-    if (!window.confirm('Czy na pewno chcesz usunąć ten przydział?')) return;
-    fetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' })
-      .then(res => {
-        if (res.ok) {
-          setAssignments(assignments => assignments.filter(a => a.id !== assignment.id));
-        }
-      });
+  const handleDeleteAssignment = async (assignment) => {
+    if (!window.confirm('Czy na pewno chcesz usunąć to zadanie?')) return;
+    
+    try {
+      await authFetch(`/api/dailyAssignments/${assignment.id}`, { method: 'DELETE' });
+      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+    } catch (error) {
+      console.error('Error deleting assignment:', error);
+      alert('Błąd podczas usuwania zadania');
+    }
   };
 
   // Modal fields for bezpylne
